@@ -35,3 +35,7 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# Local market data files (exchange data stays out of Git)
+backend/data/raw/*
+!backend/data/raw/README.md

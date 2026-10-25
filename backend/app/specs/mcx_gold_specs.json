@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "notes": [
+    "Each specification version applies only to the contract expiry months listed in its source's launch calendar.",
+    "Contracts outside every verified window resolve as UNVERIFIED and are refused by normalization unless explicitly allowed.",
+    "To add a version, cite an MCX circular, record where the copy was obtained, and set applies_to_expiry_months from that circular."
+  ],
+  "sources": {
+    "MCX/TRD/456/2025": {
+      "title": "Modification in Launch Calendar of Gold Mini, Gold Ten, Gold Guinea and Gold Petal Futures Contracts",
+      "issuer": "Multi Commodity Exchange of India Ltd",
+      "issued_on": "2025-09-11",
+      "retrieved_from": "https://www.steelcitynettrade.com/Circulars/Modification%20in%20Launch%20Calendar%20of%20Gold%20Mini,%20Gold%20Ten,%20Gold%20Guinea.pdf",
+      "retrieved_on": "2026-10-25",
+      "retrieval_notes": "mcxindia.com returned HTTP 403 to automated requests; copy obtained from a broker mirror. PDF metadata: author MCX, created 2025-09-11. Annexures 2-5 contain the full contract specifications."
+    },
+    "MCX/MCXCCL/148/2025": {
+      "title": "Delivery & Settlement Procedure for GOLD TEN Contract (MCXCCL/C&S/058/2025)",
+      "issuer": "Multi Commodity Exchange Clearing Corporation Ltd",
+      "issued_on": "2025-03-25",
+      "retrieved_from": "https://www.steelcitynettrade.com/Circulars/Delivery%20&%20Settlement%20Procedure%20for%20GOLD%20TEN%20Contract%201.pdf",
+      "retrieved_on": "2026-10-25",
+      "retrieval_notes": "Applies to GOLD TEN contracts expiring April 2025 onward. States the price basis is 999 purity."
+    }
+  },
+  "specifications": [
+    {
+      "version_id": "GOLDM@MCX/TRD/456/2025",
+      "symbol": "GOLDM",
+      "name": "Gold Mini",
+      "verification": "verified",
+      "applies_to_expiry_months": { "from": "2025-09", "to": "2026-07" },
+      "trading_unit_g": "100",
+      "quotation_base_g": "10",
+      "price_basis_fineness": 995,
+      "tick_size_inr": "1",
+      "price_quote_location": "Ex-Ahmedabad",
+      "price_quote_text": "Ex-Ahmedabad (inclusive of all taxes and levies relating to import duty, customs but excluding GST, any other additional tax, cess, octroi or surcharge as may be applicable)",
+      "delivery_unit_g": "100",
+      "quality_text": "995 purity. Serially numbered gold bars from LBMA approved suppliers or other suppliers approved by MCX.",
+      "price_basis_evidence": "Quality specification is 995 purity, and a seller delivering 999 purity receives 'Rate of delivery * 999/995'. The quoted rate therefore refers to 995 fineness.",
+      "last_trading_day_rule": { "type": "day_of_month", "day": 5 },
+      "last_trading_day_text": "5th of contract expiry month. If 5th is a holiday then preceding working day.",
+      "sources": [{ "id": "MCX/TRD/456/2025", "location": "Annexure 2 (pp. 3-6)" }],
+      "notes": []
+    },
+    {
+      "version_id": "GOLDTEN@MCX/TRD/456/2025",
+      "symbol": "GOLDTEN",
+      "name": "Gold Ten (10 gram)",
+      "verification": "verified",
+      "applies_to_expiry_months": { "from": "2025-08", "to": "2026-06" },
+      "trading_unit_g": "10",
+      "quotation_base_g": "10",
+      "price_basis_fineness": 999,
+      "tick_size_inr": "1",
+      "price_quote_location": "Ex-Ahmedabad",
+      "price_quote_text": "Ex-Ahmedabad (inclusive of all taxes and levies relating to import duty, customs but excluding GST, any other additional tax, cess, octroi or surcharge as may be applicable)",
+      "delivery_unit_g": "10",
+      "quality_text": "999 purity. Serially numbered 10 gram gold from LBMA approved suppliers or other suppliers approved by MCX.",
+      "price_basis_evidence": "MCXCCL/148/2025: 'The price of 10 Gram Gold is on the basis of 999 purity.' DDR is Ahmedabad 995 spot converted by * 999/995.",
+      "last_trading_day_rule": { "type": "last_calendar_day" },
+      "last_trading_day_text": "Last calendar day of the contract expiry month. If last calendar day is a holiday, then preceding working day.",
+      "sources": [
+        { "id": "MCX/TRD/456/2025", "location": "Annexure 3 (pp. 7-10)" },
+        { "id": "MCX/MCXCCL/148/2025", "location": "Annexure, 'Quality Adjustment' (p. 4)" }
+      ],
+      "notes": [
+        "Buyer pays Rs 300 per 10 g making charge over the DDR on delivery (MCXCCL/148/2025). Affects delivery economics, not the quoted price.",
+        "Staggered tender period: last 5 trading days in MCXCCL/148/2025 (Mar 2025) but last 3 trading days in MCX/TRD/456/2025 (Sep 2025)."
+      ]
+    },
+    {
+      "version_id": "GOLDGUINEA@MCX/TRD/456/2025",
+      "symbol": "GOLDGUINEA",
+      "name": "Gold Guinea",
+      "verification": "verified",
+      "applies_to_expiry_months": { "from": "2025-08", "to": "2026-06" },
+      "trading_unit_g": "8",
+      "quotation_base_g": "8",
+      "price_basis_fineness": 999,
+      "tick_size_inr": "1",
+      "price_quote_location": "Ex-Ahmedabad",
+      "price_quote_text": "Ex-Ahmedabad (inclusive of all taxes and levies relating to import duty, customs but excluding GST, any other additional tax, cess, octroi or surcharge as may be applicable)",
+      "delivery_unit_g": "8",
+      "quality_text": "999 purity. Serially numbered Gold Guinea from LBMA approved suppliers or other suppliers approved by MCX.",
+      "price_basis_evidence": "Quality specification is 999 purity, and the DDR is Ahmedabad 995 spot converted to 999 (* 999/995) then scaled to 8 g (* 8/10).",
+      "last_trading_day_rule": { "type": "last_calendar_day" },
+      "last_trading_day_text": "Last calendar day of the contract expiry month. If last calendar day is a holiday then preceding working day.",
+      "sources": [{ "id": "MCX/TRD/456/2025", "location": "Annexure 4 (pp. 11-13)" }],
+      "notes": [
+        "Older secondary sources describe a 995-purity Gold Guinea. Earlier contract periods may have a different price basis and are not verified."
+      ]
+    },
+    {
+      "version_id": "GOLDPETAL@MCX/TRD/456/2025",
+      "symbol": "GOLDPETAL",
+      "name": "Gold Petal",
+      "verification": "verified",
+      "applies_to_expiry_months": { "from": "2025-08", "to": "2026-06" },
+      "trading_unit_g": "1",
+      "quotation_base_g": "1",
+      "price_basis_fineness": 999,
+      "tick_size_inr": "1",
+      "price_quote_location": "Ex-Mumbai",
+      "price_quote_text": "Ex-Mumbai (inclusive of all taxes and levies relating to import duty, customs but excluding GST, any other additional tax, cess, octroi or surcharge as may be applicable)",
+      "delivery_unit_g": "1",
+      "quality_text": "999 purity. LBMA approved suppliers or other suppliers approved by MCX, with a serial-numbered certificate accompanying the 1 gram coin.",
+      "price_basis_evidence": "Quality specification is 999 purity, and the DDR is Mumbai 995 spot converted to 999 (* 999/995) then scaled to 1 g (* 1/10).",
+      "last_trading_day_rule": { "type": "last_calendar_day" },
+      "last_trading_day_text": "Last calendar day of the contract expiry month. If last calendar day is a holiday then preceding working day.",
+      "sources": [{ "id": "MCX/TRD/456/2025", "location": "Annexure 5 (pp. 14-16)" }],
+      "notes": [
+        "Priced Ex-Mumbai while GOLDM, GOLDTEN and GOLDGUINEA are Ex-Ahmedabad. Location basis is not adjusted by normalization.",
+        "Tick size Rs 1 per 1 g equals Rs 10 per 10 g, ten times coarser than GOLDTEN per gram."
+      ]
+    }
+  ],
+  "instrument_listing": {
+    "GOLDTEN": {
+      "first_trading_date": "2025-04-01",
+      "evidence": "MCXCCL/148/2025 covers GOLD TEN contracts expiring April 2025 onward and cites launch circular MCX/TRD/134/2025 (2025-03-18, not read). Launch date 2025-04-01 reported consistently by secondary sources."
+    }
+  }
+}

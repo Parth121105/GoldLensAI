@@ -12,8 +12,10 @@ live market terminal, and not financial advice.
 |---|---|
 | Frontend shell (`frontend/`) | Vite + React + TypeScript + Tailwind v4 + Motion. Placeholder page only. |
 | Backend (`backend/`) | FastAPI app with `GET /api/health`. No data or research endpoints yet. |
-| Historical MCX data | None included. Import workflow not built yet. |
-| Contract specifications | Not yet verified or encoded. |
+| Contract specifications | Verified from MCX circulars for expiries Aug/Sep 2025 – Jun/Jul 2026. Other periods are unverified. See [docs/methodology/specifications.md](docs/methodology/specifications.md). |
+| Normalization | INR per gram at 999 fineness, with tests. See [docs/methodology/normalization.md](docs/methodology/normalization.md). |
+| Data import | CSV validation pipeline plus a CLI. Not yet stored or exposed through the API. See [docs/data-import.md](docs/data-import.md). |
+| Historical MCX data | **None included.** Tests use clearly labelled synthetic fixtures only. |
 
 ## Repository layout
 
@@ -21,7 +23,13 @@ live market terminal, and not financial advice.
 backend/            FastAPI service (Python)
   app/main.py       Application factory; all routes mounted under /api
   app/api/health.py GET /api/health
-  tests/            pytest suite
+  app/specs/        Versioned contract specifications with sources (JSON + loader)
+  app/ingestion/    Bhavcopy CSV parsing, validation, provenance
+  app/normalization.py  Specification-aware price normalization
+  app/cli.py        Command-line tools (specs, import)
+  data/raw/         Your local MCX CSV files (ignored by Git)
+  tests/            pytest suite; tests/fixtures/synthetic/ holds SYNTHETIC test data
+docs/               Methodology and data-import documentation
   requirements.txt      Pinned runtime dependencies
   requirements-dev.txt  Pinned runtime + test dependencies
 frontend/           Vite + React + TypeScript client
@@ -101,6 +109,21 @@ any data has been loaded.
 | `version` | Backend application version |
 | `api_version` | Version of the public API contract |
 | `server_time` | Current server time, ISO 8601, UTC |
+
+## Command-line tools
+
+From `backend/`:
+
+```powershell
+# List contract specification versions, verification windows and sources
+.venv\Scripts\python.exe -m app.cli specs
+
+# Validate a Bhavcopy CSV and print accepted/rejected/skipped rows
+.venv\Scripts\python.exe -m app.cli import data\raw\<file>.csv
+```
+
+See [docs/data-import.md](docs/data-import.md) for supported layouts and
+validation rules.
 
 ## Checks
 
