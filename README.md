@@ -15,7 +15,8 @@ live market terminal, and not financial advice.
 | Contract specifications | Verified from MCX circulars for expiries Aug/Sep 2025 – Jun/Jul 2026. Other periods are unverified. See [docs/methodology/specifications.md](docs/methodology/specifications.md). |
 | Normalization | INR per gram at 999 fineness, with tests. See [docs/methodology/normalization.md](docs/methodology/normalization.md). |
 | Data import | CSV validation pipeline plus a CLI. Not yet stored or exposed through the API. See [docs/data-import.md](docs/data-import.md). |
-| Historical MCX data | **None included.** Tests use clearly labelled synthetic fixtures only. |
+| Research engine | Spread anomalies, cost model (unknown ≠ zero), lifecycle filters and walk-forward validation, with tests. See [docs/methodology/research.md](docs/methodology/research.md). **Not yet run on real data.** |
+| Historical MCX data | **None included.** Tests use clearly labelled synthetic data only. See [docs/data-requirements.md](docs/data-requirements.md) for what to download. |
 
 ## Repository layout
 
@@ -26,6 +27,7 @@ backend/            FastAPI service (Python)
   app/specs/        Versioned contract specifications with sources (JSON + loader)
   app/ingestion/    Bhavcopy CSV parsing, validation, provenance
   app/normalization.py  Specification-aware price normalization
+  app/research/     Pair spreads, anomaly levels, costs, walk-forward validation
   app/cli.py        Command-line tools (specs, import)
   data/raw/         Your local MCX CSV files (ignored by Git)
   tests/            pytest suite; tests/fixtures/synthetic/ holds SYNTHETIC test data
@@ -120,7 +122,13 @@ From `backend/`:
 
 # Validate a Bhavcopy CSV and print accepted/rejected/skipped rows
 .venv\Scripts\python.exe -m app.cli import data\raw\<file>.csv
+
+# Run spread research and walk-forward validation over many files
+.venv\Scripts\python.exe -m app.cli research (Get-ChildItem data\raw\*.csv) --costs costs.json
 ```
+
+Without `--costs`, every cost component is reported as unknown and no result
+can be classed as validated.
 
 See [docs/data-import.md](docs/data-import.md) for supported layouts and
 validation rules.
