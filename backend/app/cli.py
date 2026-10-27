@@ -3,12 +3,16 @@
     python -m app.cli specs
     python -m app.cli import <file.csv> [--date-order DMY|MDY] [--json]
     python -m app.cli research <file.csv> [<file.csv> ...] [--costs costs.json] [--horizon N]
+    python -m app.cli package-extract <package.pdf> <output-dir>
+    python -m app.cli package-audit <table.csv> [<table.csv> ...] [--out audit.json]
+    python -m app.cli readiness <bhavcopy file> [...]
 """
 
 from __future__ import annotations
 
 import argparse
 import dataclasses
+import hashlib
 import json
 import sys
 from datetime import date, datetime
@@ -17,6 +21,8 @@ from enum import Enum
 from pathlib import Path
 
 from app.ingestion import DateOrder, ImportFailedError, import_bhavcopy
+from app.ingestion.package import PackageImportError, audit_dict, import_package_table
+from app.ingestion.package_pdf import PackageExtractError, extract_blocks, pdf_to_text
 from app.research import CostModel, MixedDataError, ResearchConfig, run_research
 from app.specs import default_registry
 
@@ -38,9 +44,26 @@ def main(argv: list[str] | None = None) -> int:
     p_research.add_argument("--costs", type=Path, help="JSON file of cost components (see docs)")
     p_research.add_argument("--horizon", type=int, default=ResearchConfig().horizon)
 
+    p_extract = sub.add_parser("package-extract", help="Recover the package CSV tables from its PDF")
+    p_extract.add_argument("pdf", type=Path)
+    p_extract.add_argument("out_dir", type=Path)
+
+    p_audit = sub.add_parser("package-audit", help="Validate package tables and write an audit report")
+    p_audit.add_argument("files", type=Path, nargs="+")
+    p_audit.add_argument("--out", type=Path, help="Write the audit JSON here as well as printing a summary")
+
+    p_ready = sub.add_parser("readiness", help="Assess whether Bhavcopy files can support research or a model")
+    p_ready.add_argument("files", type=Path, nargs="+")
+
     args = parser.parse_args(argv)
     if args.command == "specs":
         return _print_specs()
+    if args.command == "package-extract":
+        return _package_extract(args.pdf, args.out_dir)
+    if args.command == "package-audit":
+        return _package_audit(args.files, args.out)
+    if args.command == "readiness":
+        return _readiness(args.files)
     if args.command == "research":
         return _research(args.files, args.date_order and DateOrder(args.date_order), args.costs,
                          args.horizon)
@@ -137,6 +160,80 @@ def _json_default(value: object) -> object:
     if isinstance(value, Enum):
         return value.value
     raise TypeError(f"Cannot serialise {type(value).__name__}")
+
+
+def _package_extract(pdf: Path, out_dir: Path) -> int:
+    """Write each CSV block of the package PDF to out_dir, with a manifest of hashes.
+
+    The PDF is only read. An existing output file with different content is never
+    overwritten.
+    """
+    try:
+        text, tool = pdf_to_text(pdf)
+        tables = extract_blocks(text)
+    except PackageExtractError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for t in tables:
+        target = out_dir / t.file_name
+        if target.exists() and target.read_text(encoding="utf-8") != t.csv_text:
+            print(f"error: {target} exists with different content; not overwritten", file=sys.stderr)
+            return 1
+    for t in tables:
+        (out_dir / t.file_name).write_text(t.csv_text, encoding="utf-8", newline="\n")
+        print(f"{t.file_name}: {t.rows} rows, sha256 {t.sha256}")
+    manifest = {
+        "source_pdf": pdf.name,
+        "source_pdf_sha256": hashlib.sha256(pdf.read_bytes()).hexdigest(),
+        "extracted_with": tool,
+        "extracted_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "method": "CSV blocks between ===BEGIN and ===END; page footers removed; every row checked for the header's column count",
+        "files": {t.file_name: {"rows": t.rows, "sha256": t.sha256} for t in tables},
+    }
+    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    return 0
+
+
+def _package_audit(files: list[Path], out: Path | None) -> int:
+    audits = []
+    for path in files:
+        try:
+            result = import_package_table(path.read_bytes(), source_name=path.name)
+        except PackageImportError as exc:
+            print(f"{path.name}: not imported: {exc}", file=sys.stderr)
+            return 1
+        audit = audit_dict(result)
+        audits.append(audit)
+        print(
+            f"{audit['table_id']} {path.name}: read {audit['rows_read']}, accepted {audit['accepted']}, "
+            f"rejected {audit['rejected']}, duplicates {audit['exact_duplicates_dropped']}, "
+            f"warnings {sum(audit['row_warnings'].values()) + len(audit['table_warnings'])}"
+        )
+    if out:
+        out.write_text(json.dumps({"tables": audits}, indent=2, default=_json_default) + "\n", encoding="utf-8")
+        print(f"audit written to {out}")
+    return 0
+
+
+def _readiness(files: list[Path]) -> int:
+    from app.research.readiness import assess
+
+    imports = []
+    for path in files:
+        try:
+            imports.append(import_bhavcopy(path))
+        except ImportFailedError as exc:
+            print(f"{path.name}: not imported: {exc}", file=sys.stderr)
+            return 1
+    r = assess(imports)
+    print(f"verdict: {r.verdict.value}")
+    print(r.model)
+    for c in r.checks:
+        print(f"  {'PASS' if c.passed else 'FAIL'}  {c.label}: {c.detail}")
+    for m in r.missing:
+        print(f"  missing: {m}")
+    return 0
 
 
 if __name__ == "__main__":

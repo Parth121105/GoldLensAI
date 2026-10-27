@@ -115,7 +115,8 @@ def test_report_metadata(legacy):
     r = legacy.report
 
     assert r.synthetic is True
-    assert r.layout_verified_against_real_file is False
+    # Checked on 26 Oct 2026 against one real MCX date-wise download (see columns.py).
+    assert r.layout_verified_against_real_file is True
     assert r.units["volume"] == "lots"
     assert r.trade_dates == [date(2025, 10, 15)]
     assert r.warnings == []
@@ -239,3 +240,12 @@ def test_filename_date_disagreeing_with_contents_is_reported():
     assert result.report.synthetic is False
     assert any("Filename suggests 2025-10-01" in w for w in result.report.warnings)
     assert result.observations[0].trade_date == date(2025, 10, 15)
+
+
+@pytest.mark.parametrize("encoding", ["utf-16", "utf-16-le"])
+def test_utf16_files_get_an_encoding_message_not_binary(encoding):
+    """Regression: Excel 'Unicode Text' exports were reported as binary data."""
+    data = "Date,Symbol,Expiry Date,Close\n15-Oct-2025,GOLDM,05-Nov-2025,121000\n".encode(encoding)
+
+    with pytest.raises(ImportFailedError, match="UTF-16"):
+        import_bhavcopy_bytes(data, source_name="excel_unicode.csv")

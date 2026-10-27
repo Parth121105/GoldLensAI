@@ -24,6 +24,23 @@ def test_unambiguous_date_formats(text):
     assert parse_date(text) == date(2025, 10, 15)
 
 
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("2026-01-04T20:00:00Z", date(2026, 1, 5)),  # 01:30 IST on the 5th
+        ("2026-01-04T20:00:00+00:00", date(2026, 1, 5)),
+        ("2026-01-04T23:30:00+05:30", date(2026, 1, 4)),
+        ("2026-01-04T20:00:00", date(2026, 1, 4)),  # no offset: taken as the exchange's own day
+        ("2025-01-01 9:30Z", date(2025, 1, 1)),  # single-digit hour
+        ("2025-01-01 10:00 +05:30", date(2025, 1, 1)),  # space before the offset
+        ("2025-01-01T21:00:00.250-0500", date(2025, 1, 2)),  # fraction, compact offset
+    ],
+)
+def test_timestamps_with_offsets_use_the_exchange_day(text, expected):
+    """Regression: an explicit offset used to be dropped, shifting UTC evenings a day early."""
+    assert parse_date(text) == expected
+
+
 def test_numeric_date_requires_known_order():
     with pytest.raises(ParseError, match="Ambiguous"):
         parse_date("05/11/2025")

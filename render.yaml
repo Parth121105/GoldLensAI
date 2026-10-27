@@ -1,0 +1,19 @@
+# Render Blueprint: one free web service that serves the FastAPI API under /api
+# and the built React frontend at every other path (single origin, no CORS).
+services:
+  - type: web
+    name: goldlensai
+    runtime: python
+    # Must be explicit: Render's default instance type for a new web service is paid.
+    plan: free
+    buildCommand: bash scripts/render-build.sh
+    startCommand: cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      # Render's documented default for new services (2026-10); the pinned
+      # requirements have Linux wheels for it. Full version required.
+      - key: PYTHON_VERSION
+        value: 3.14.8
+      # The build script also refuses to run on any Node other than 24.x.
+      - key: NODE_VERSION
+        value: 24.22.1

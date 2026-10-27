@@ -3,9 +3,11 @@ from datetime import UTC, datetime, timedelta
 from fastapi.testclient import TestClient
 
 from app import __version__
-from app.main import app
+from app.main import create_app
 
-client = TestClient(app)
+# API-only app: these tests must not depend on whether frontend/dist has been built.
+# Frontend serving is covered in test_frontend_serving.py.
+client = TestClient(create_app(frontend_dist=None))
 
 
 def test_health_returns_ok():

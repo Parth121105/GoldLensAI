@@ -114,7 +114,11 @@ all of its expiry-matched series.
    direction × (spread_t − spread_t+h), where direction is the sign of the
    deviation. Positive means the spread moved back toward the baseline.
    - **Signal events** are levels 2–3. They don't overlap: a new signal starts
-     only after the previous signal's outcome date.
+     only after the previous signal's outcome date. This holds across the whole
+     symbol pair, not only within one series: several expiries of the same two
+     symbols trade at once, so one market move can flag in each of them on the
+     same day, and counting each would inflate n and t. The pooled set keeps the
+     earliest signal (largest deviation, then series id, on ties).
    - **Control events** are all other points with a valid baseline.
 4. **Purging.** An event counts in a window only if both its date and its
    outcome date fall inside that window.
@@ -130,15 +134,18 @@ all of its expiry-matched series.
 
 | Verdict | Condition |
 |---|---|
-| `insufficient_data` | Folds and a holdout can't be formed, or the holdout has fewer than `min_events` (20) signals |
-| `not_supported` | Holdout mean ≤ 0, or t < 2, or not above the control mean, or a majority of folds not positive |
+| `insufficient_data` | Folds and a holdout can't be formed, the holdout has fewer than `min_events` (20) signals, or no development fold has `min_events` test signals (so consistency across folds can't be checked) |
+| `not_supported` | Holdout mean ≤ 0, or t < 2, or not above the control mean, or a majority of the folds with at least `min_events` test signals not positive |
 | `supported_before_costs_costs_unknown` | Gross evidence supports H1 but at least one cost component is unknown |
 | `not_supported_after_costs` | Net mean ≤ 0 or net t < 2 |
 | `historically_validated` | All of the above pass with fully known costs. Still a historical result, not a recommendation |
 
 The t-statistic is mean / (sd / √n) over non-overlapping signal events. It is
-descriptive. Events in different series on nearby dates may still be
-correlated.
+descriptive. Folds with fewer than `min_events` test signals are shown but do
+not vote in the fold-consistency check. With one year of daily data, the
+synthetic demo gives every pair fewer than 20 independent holdout signals, so
+every pair is `insufficient_data`; that is the honest result for that much
+history, not a fault.
 
 ## What the tests prove (on synthetic data)
 
@@ -161,8 +168,10 @@ markets.
 
 ## Known limitations
 
-- **No real data has been analysed yet.** Every result so far comes from
-  synthetic test data.
+- **No real history has been analysed yet.** One real MCX trading day
+  (23 Oct 2026) has been imported and audited, but research needs years of daily
+  data (`GET /api/readiness` reports `INSUFFICIENT_DATA`). Every research result so
+  far comes from synthetic data.
 - The calendar-day lifecycle buffer approximates the trading-day tender
   period, because exchange holidays are not modelled.
 - Location basis (GOLDPETAL is Ex-Mumbai), delivery making charges and carry

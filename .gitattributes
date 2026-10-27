@@ -1,0 +1,2 @@
+# Shell scripts run on Render's Linux build machines; keep LF endings.
+*.sh text eol=lf

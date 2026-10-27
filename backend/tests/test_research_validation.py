@@ -9,7 +9,15 @@ from app.ingestion.models import ImportReport, ImportResult
 from app.research import CostModel, MixedDataError, ResearchConfig, Verdict, run_research
 from app.research.engine import merge_observations
 from app.research.pairs import build_pair_series
-from app.research.validation import Event, _in_window, validate_symbol_pair
+from app.research.validation import (
+    Event,
+    OutcomeStats,
+    PairValidation,
+    WindowResult,
+    _decide,
+    _in_window,
+    validate_symbol_pair,
+)
 from tests.synthetic_market import month_end, observation, pair_market, verified_expiries
 
 COST_NAMES = ("brokerage", "exchange_transaction_charges", "statutory_taxes_and_levies", "slippage")
@@ -130,6 +138,51 @@ def test_signal_events_do_not_overlap():
         last = by_pair.get(e.pair_id)
         assert last is None or e.trade_date > last.outcome_date
         by_pair[e.pair_id] = e
+
+
+def test_pooled_signals_do_not_overlap_across_series():
+    """Regression: several expiries trade at once, so one move used to count once per series."""
+    config = replace(BASE, horizon=3)
+    series = build_pair_series(pair_market(reverting, verified_expiries()), config)
+    from app.research.validation import _events
+
+    assert len(series) > 1
+    signals = sorted(_events(series, (1.5, 5), config).signals, key=lambda e: e.trade_date)
+    assert signals
+    for earlier, later in zip(signals, signals[1:]):
+        assert later.trade_date > earlier.outcome_date
+    assert len({e.trade_date for e in signals}) == len(signals)
+
+
+def _window(label, n, mean, std, t):
+    stats = OutcomeStats(n, mean, std, t, 1.0 if n else None, None, None)
+    empty = OutcomeStats(0, None, None, None, None, None, None)
+    span = (date(2025, 7, 1), date(2025, 12, 31))
+    return WindowResult(label, span, span, (1.5, 5), n, stats, empty, "ok")
+
+
+def _decided(folds, final):
+    result = PairValidation("A/B", ["a|b"], 200, folds=folds, final=final)
+    _decide(result, BASE)
+    return result
+
+
+def test_folds_below_min_events_do_not_vote():
+    """Regression: folds with 1-2 signals used to decide the fold-majority check."""
+    thin = [_window(f"fold {k}", n, 4.0, 1.0, 5.0) for k, n in enumerate((1, 2, 1), 1)]
+    result = _decided(thin, _window("final holdout", 25, 4.0, 1.0, 20.0))
+
+    assert result.verdict is Verdict.INSUFFICIENT_DATA
+    assert "consistency across folds" in result.reasons[-1]
+
+
+def test_zero_variance_holdout_does_not_crash():
+    """Regression: a holdout whose outcomes are all equal has no t-statistic."""
+    folds = [_window(f"fold {k}", BASE.min_events, 4.0, 1.0, 5.0) for k in (1, 2, 3)]
+    result = _decided(folds, _window("final holdout", 25, 3.0, 0.0, None))
+
+    assert result.verdict is Verdict.NOT_SUPPORTED
+    assert "t=n/a" in result.reasons[-1]
 
 
 def test_missing_observations_are_skipped_not_filled():

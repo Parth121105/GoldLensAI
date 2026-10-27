@@ -158,7 +158,23 @@ def _events(series_list: list[PairSeries], params: Params, config: ResearchConfi
                     next_allowed = outcome.trade_date
             else:
                 controls.append(event)
-    return _EventSet(signals, controls)
+    return _EventSet(_non_overlapping(signals), controls)
+
+
+def _non_overlapping(signals: list[Event]) -> list[Event]:
+    """Signals across every series of the pair, none starting before the last kept outcome.
+
+    Several expiries of the same two symbols trade at once, so one market move can flag
+    in each series on the same day. Counting each as an independent event would inflate
+    n and the t-statistic, so the pooled set keeps the earliest signal (largest
+    deviation, then series id, on ties) and skips any that starts inside its outcome window.
+    """
+    ordered = sorted(signals, key=lambda e: (e.trade_date, -abs(e.deviation_bps), e.pair_id))
+    kept: list[Event] = []
+    for event in ordered:
+        if not kept or event.trade_date > kept[-1].outcome_date:
+            kept.append(event)
+    return kept
 
 
 def _evaluate(
@@ -207,7 +223,16 @@ def _decide(result: PairValidation, config: ResearchConfig) -> None:
         )
         return
 
-    evaluable = [f for f in result.folds if f.params is not None and f.signals.n > 0]
+    # A fold votes only with as many test signals as the holdout needs; thinner folds
+    # are shown as "not evidence" and must not decide the consistency check.
+    evaluable = [f for f in result.folds if f.params is not None and f.signals.n >= config.min_events]
+    if not evaluable:
+        result.verdict = Verdict.INSUFFICIENT_DATA
+        result.reasons.append(
+            f"No development fold has {config.min_events} test signals, so consistency "
+            "across folds cannot be checked."
+        )
+        return
     positive_folds = sum(1 for f in evaluable if (f.signals.mean_gross_bps or 0) > 0)
     assert s.mean_gross_bps is not None
     gross_supported = (
@@ -218,7 +243,7 @@ def _decide(result: PairValidation, config: ResearchConfig) -> None:
     )
     result.reasons.append(
         f"Holdout: {s.n} signals, mean reversion {s.mean_gross_bps:.2f} bps "
-        f"(t={s.t_stat_gross:.2f}), controls {_fmt(c.mean_gross_bps)} bps; "
+        f"(t={_fmt(s.t_stat_gross)}), controls {_fmt(c.mean_gross_bps)} bps; "
         f"{positive_folds}/{len(evaluable)} folds positive."
     )
     if not gross_supported:

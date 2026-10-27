@@ -18,6 +18,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from app.ingestion.columns import Field, Layout, detect_layout
+from app.ingestion.html_table import looks_like_html_table, read_html_table
 from app.ingestion.models import (
     ContractCoverage,
     ImportReport,
@@ -40,7 +41,7 @@ from app.instruments import canonical_symbol, is_supported
 from app.specs import SpecRegistry, UnknownInstrumentError, default_registry
 
 OPTION_TYPES = frozenset({"CE", "PE", "CA", "PA", "CALL", "PUT"})
-SYNTHETIC_PREFIX = "SYNTHETIC"
+SYNTHETIC_PREFIX = "SYNTHETIC_"  # the underscore is required: "Synthetically..." is not a label
 
 
 class ImportFailedError(ValueError):
@@ -80,10 +81,32 @@ def import_bhavcopy_bytes(
     today = today or datetime.now(UTC).date()
     file_warnings: list[str] = []
 
+    if data[:2] in (b"\xff\xfe", b"\xfe\xff") or (len(data) >= 4 and data[1] == 0 and data[3] == 0):
+        raise ImportFailedError(
+            f"{source_name} appears to be UTF-16 encoded (for example Excel's 'Unicode Text'). "
+            "Save it as a CSV (UTF-8 or comma-delimited) and upload it again."
+        )
+    if b"\x00" in data:
+        raise ImportFailedError(f"{source_name} is not a readable CSV file (contains binary data).")
     text = _decode(data, file_warnings)
-    reader = csv.reader(io.StringIO(text))
-    # Keep physical line numbers so rejections point at the right line in the file.
-    rows = [(reader.line_num, r) for r in reader if any(cell.strip() for cell in r)]
+    if looks_like_html_table(text):
+        # MCX's date-wise download is an HTML table saved as .xls. Rows are numbered
+        # by their position in the table (header = 1) instead of by physical line.
+        table = read_html_table(text)
+        rows = [(i, r) for i, r in enumerate(table, start=1) if any(cell.strip() for cell in r)]
+        file_warnings.append(
+            "File is an HTML table (MCX's date-wise .xls download), not an Excel workbook; "
+            "line numbers refer to table rows, header = 1."
+        )
+    else:
+        reader = csv.reader(io.StringIO(text))
+        try:
+            # Keep physical line numbers so rejections point at the right line in the file.
+            rows = [(reader.line_num, r) for r in reader if any(cell.strip() for cell in r)]
+        except csv.Error as exc:
+            raise ImportFailedError(
+                f"{source_name} is not a readable CSV file (line {reader.line_num}: {exc})"
+            ) from exc
     if not rows:
         raise ImportFailedError(f"{source_name} contains no rows")
 

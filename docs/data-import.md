@@ -14,15 +14,57 @@ cd backend
 .venv\Scripts\python.exe -m app.cli import data\raw\<file>.csv --date-order DMY # if dates are ambiguous
 ```
 
-Importing only validates the file and prints a report. Nothing is stored yet;
-persistence comes in Phase 5.
+The CLI only validates the file and prints a report; it stores nothing.
+
+### Uploading through the dashboard or API
+
+Upload files on the dashboard's **Data** screen, or send each file as the raw
+request body:
+
+```powershell
+curl.exe -X POST "http://localhost:8000/api/datasets?filename=bhav.csv" `
+  -H "Content-Type: text/csv" --data-binary "@data\raw\bhav.csv"
+```
+
+The same importer validates the file, and the response contains the report
+described below.
+
+- **Size.** Uploads above `GOLDLENS_MAX_UPLOAD_BYTES` (default 5 MB) are
+  refused with HTTP 413.
+- **Bad files.** Empty files return 400. Binary or unreadable files, missing
+  required columns, and ambiguous numeric dates return 422 with the reason.
+- **Filename.** It is used only as a display name, never as a path.
+- **Synthetic labelling.** A name starting with `SYNTHETIC_` marks the file as
+  synthetic.
+- **Storage.** Accepted observations are kept in the server's memory for the
+  session (never on disk), so they are lost on restart or redeploy.
 
 ## Supported layouts
 
-Neither layout has been checked against a real MCX download yet, because
-mcxindia.com blocks automated access. Column names come from secondary
-sources. Every report includes `layout_verified_against_real_file: false`
-until that changes.
+The legacy layout was checked on 26 Oct 2026 against one real MCX date-wise
+download supplied by the user (`BhavCopyDateWise_23102026.xls`, 16,737 rows), so
+its reports carry `layout_verified_against_real_file: true`. The UDiFF layout has
+not been checked against a real file (its column names come from secondary
+sources) and reports `false`.
+
+### MCX date-wise download (`.xls`)
+
+MCX's date-wise download is **not an Excel workbook**: it is an HTML `<table>`
+saved with an `.xls` extension, with the legacy columns (`Date`, `Instrument
+Name`, `Symbol`, `Expiry Date`, `Option Type`, `Strike Price`, `Open`, `High`,
+`Low`, `Close`, `Previous Close`, `Volume(Lots)`, `Volume(In 000's)`,
+`Value(Lacs)`, `Open Interest(Lots)`). The importer reads the first table with
+the standard library's HTML parser; nothing in the file is executed or fetched.
+Rejected-row numbers then refer to table rows (header = 1). A full-market day is
+about 17 MB, so the default upload limit is 25 MB.
+
+### GoldLensAI package tables (A1, A2, B1, B2)
+
+The four tables of the MCX gold data package are recognised by their exact
+header row and audited by `app/ingestion/package.py`; see
+[data-audit-mcx-gold-package.md](data-audit-mcx-gold-package.md). B1 (daily
+futures) also goes through the Bhavcopy importer into research. B2 (options) and
+A1/A2 (year-wise totals) are stored separately and never become futures prices.
 
 Header matching ignores case, spaces and punctuation.
 

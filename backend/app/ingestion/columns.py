@@ -1,9 +1,11 @@
 """Supported Bhavcopy column layouts.
 
-Neither layout has yet been checked against a file downloaded from MCX
-(mcxindia.com blocks automated access). Column names come from secondary
-sources; see docs/data-import.md. Header matching ignores case, spaces and
-punctuation, so "Volume (Lots)" and "VOLUME_LOTS" both match "volumelots".
+The legacy layout's columns were checked on 26 Oct 2026 against one MCX
+date-wise download supplied by the user (BhavCopyDateWise_23102026.xls, an HTML
+table, SHA-256 4a931460...; 16,737 rows, 15 columns). The UDiFF layout has not
+been checked against a real file; its column names come from secondary sources.
+See docs/data-import.md. Header matching ignores case, spaces and punctuation,
+so "Volume (Lots)" and "VOLUME_LOTS" both match "volumelots".
 """
 
 from __future__ import annotations
@@ -59,10 +61,11 @@ LEGACY = Layout(
         Field.CLOSE: ("close",),
         Field.PREVIOUS_CLOSE: ("previousclose", "prevclose"),
         Field.VOLUME: ("volumelots",),
-        Field.VALUE: ("valuelacs", "valuelakhs", "valueinlacs", "valueinlakhs"),
+        Field.VALUE: ("valuelacs", "valuelakhs", "valuelakh", "valueinlacs", "valueinlakhs"),
         Field.OPEN_INTEREST: ("openinterestlots", "openinterest"),
     },
     units={"volume": "lots", "value": "INR lakhs", "open_interest": "lots"},
+    verified_against_real_file=True,
 )
 
 UDIFF = Layout(
@@ -124,8 +127,11 @@ def detect_layout(headers: list[str]) -> tuple[Layout, dict[Field, int]]:
     layout, mapping, missing = best
     if missing:
         names = ", ".join(sorted(layout.aliases[f][0] for f in missing))
+        seen = repr(headers)
+        if len(seen) > 300:
+            seen = seen[:300] + "..."
         raise MissingColumnsError(
             f"Required columns not found (closest layout: {layout.id}; missing: {names}). "
-            f"Headers seen: {headers}"
+            f"Headers seen: {seen}"
         )
     return layout, mapping

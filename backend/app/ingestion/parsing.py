@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 
@@ -20,6 +20,11 @@ _FOUR_DIGIT_YEAR = re.compile(r"(?<!\d)\d{4}(?!\d)")
 _COMPACT_YMD = re.compile(r"^\d{8}$")
 _NUMERIC_DATE = re.compile(r"^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$")
 _ISO_WITH_TIME = re.compile(r"^(\d{4}-\d{2}-\d{2})[T ]\d{1,2}:\d{2}")
+_HAS_OFFSET = re.compile(r"(Z|[+-]\d{2}:?\d{2})$")
+_ISO_WITH_OFFSET = re.compile(
+    r"^(\d{4})-(\d{2})-(\d{2})[T ](\d{1,2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?\s*(Z|([+-])(\d{2}):?(\d{2}))$"
+)
+IST = timezone(timedelta(hours=5, minutes=30))
 
 MIN_YEAR, MAX_YEAR = 2000, 2100
 
@@ -41,9 +46,29 @@ def is_missing(value: str | None) -> bool:
     return value is None or value.strip().strip('"').upper() in MISSING_TOKENS
 
 
+def _offset_timestamp_ist_date(text: str, value: str) -> date:
+    """The IST calendar date of a timestamp with an explicit offset ("Z" or "+05:30")."""
+    m = _ISO_WITH_OFFSET.match(text)
+    if not m:
+        raise ParseError(f"Invalid timestamp {value!r}")
+    y, mo, d, h, mi, sec, zone, sign, oh, om = m.groups()
+    tz = timezone.utc if zone == "Z" else timezone(
+        (1 if sign == "+" else -1) * timedelta(hours=int(oh), minutes=int(om))
+    )
+    try:
+        moment = datetime(int(y), int(mo), int(d), int(h), int(mi), int(sec or 0), tzinfo=tz)
+    except ValueError as exc:
+        raise ParseError(f"Invalid timestamp {value!r}: {exc}") from exc
+    return moment.astimezone(IST).date()
+
+
 def parse_date(value: str, order: DateOrder | None = None) -> date:
     text = value.strip().strip('"')
     if m := _ISO_WITH_TIME.match(text):
+        if _HAS_OFFSET.search(text):
+            # A timestamp with an explicit offset (e.g. UTC "Z") is converted to the
+            # exchange's own calendar day, India Standard Time, before taking the date.
+            return _check_year(_offset_timestamp_ist_date(text, value), value)
         text = m.group(1)
 
     if m := _NUMERIC_DATE.match(text):
