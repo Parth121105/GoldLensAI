@@ -1,0 +1,176 @@
+/* Ink kit: hatched page, bracketed frames and line diagrams for the Data, Contracts, Research and
+   Methodology pages. Every rule is scoped under .ink-page so nothing reaches the Overview, and every
+   colour is read from the palette in index.css (never redefined here).
+   Rules sit in the components layer, so Tailwind utilities on the same element always win. */
+
+@layer components {
+  .ink-page {
+    --ink-line: var(--color-rule);
+    --ink-line-strong: var(--color-rule-strong);
+    --ink-hatch: color-mix(in oklch, var(--color-ink) 4.5%, transparent);
+    --ink-raise: color-mix(in oklch, var(--color-surface) 55%, var(--color-sunken));
+    --ink-bracket: color-mix(in oklch, var(--color-ink-3) 70%, transparent);
+    --ink-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    position: relative;
+    border: 1px solid var(--ink-line);
+    background-color: var(--color-ground);
+    background-image: repeating-linear-gradient(135deg, var(--ink-hatch) 0 1px, transparent 1px 10px);
+    padding: clamp(18px, 3vw, 36px) clamp(12px, 2.6vw, 32px);
+  }
+
+  /* Header: a small square tag over a two-tone title. */
+  .ink-page .ink-tag {
+    display: inline-block;
+    border: 1px solid var(--ink-line);
+    background: var(--color-surface);
+    padding: 3px 9px;
+    font-size: 11.5px;
+    letter-spacing: 0.02em;
+    color: var(--color-ink-2);
+  }
+  .ink-page .ink-title {
+    font-size: clamp(26px, 3.6vw, 40px);
+    line-height: 1.08;
+    letter-spacing: -0.025em;
+    font-weight: 500;
+    color: var(--color-ink);
+  }
+  .ink-page .ink-title .ink-muted {
+    color: var(--color-ink-3);
+  }
+
+  /* Frame: a card with four corner brackets that step outward on hover. */
+  .ink-page .ink-frame {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .ink-page .ink-c {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border: 0 solid var(--ink-bracket);
+    pointer-events: none;
+    transition: border-color 0.3s, transform 0.35s var(--ink-ease);
+  }
+  .ink-page .ink-c-tl { top: -6px; left: -6px; border-top-width: 1.5px; border-left-width: 1.5px; }
+  .ink-page .ink-c-tr { top: -6px; right: -6px; border-top-width: 1.5px; border-right-width: 1.5px; }
+  .ink-page .ink-c-bl { bottom: -6px; left: -6px; border-bottom-width: 1.5px; border-left-width: 1.5px; }
+  .ink-page .ink-c-br { bottom: -6px; right: -6px; border-bottom-width: 1.5px; border-right-width: 1.5px; }
+  .ink-page .ink-frame:hover > .ink-c { border-color: var(--color-gold); }
+  .ink-page .ink-frame:hover > .ink-c-tl { transform: translate(-3px, -3px); }
+  .ink-page .ink-frame:hover > .ink-c-tr { transform: translate(3px, -3px); }
+  .ink-page .ink-frame:hover > .ink-c-bl { transform: translate(-3px, 3px); }
+  .ink-page .ink-frame:hover > .ink-c-br { transform: translate(3px, 3px); }
+
+  .ink-page .ink-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+    border: 1px solid var(--ink-line);
+    background: linear-gradient(180deg, var(--ink-raise), var(--color-surface));
+    padding: clamp(14px, 2vw, 22px);
+    transition: border-color 0.3s, box-shadow 0.35s;
+  }
+  .ink-page .ink-frame:hover > .ink-card {
+    border-color: var(--ink-line-strong);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 30px -14px rgb(0 0 0 / 0.7);
+  }
+  .ink-page .ink-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    color: var(--color-ink);
+  }
+  .ink-page .ink-card-desc {
+    margin-top: 2px;
+    max-width: 62ch;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--color-ink-3);
+  }
+
+  /* Diagrams: SVG drawn from data. Lines and nodes light up in gold when their item is active. */
+  .ink-page .ink-diagram {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+  .ink-page .ink-flow {
+    fill: none;
+    stroke: var(--ink-line-strong);
+    stroke-width: 1.2;
+    transition: stroke 0.3s, stroke-width 0.3s;
+  }
+  .ink-page .ink-flow-dash { stroke-dasharray: 3 4; }
+  .ink-page .ink-flow[data-on="true"] { stroke: var(--color-gold); stroke-width: 1.6; }
+  .ink-page .ink-flow[data-tone="loss"][data-on="true"] { stroke: var(--color-loss); }
+  .ink-page .ink-node {
+    fill: var(--ink-raise);
+    stroke: var(--ink-line-strong);
+    transition: stroke 0.3s, fill 0.3s;
+  }
+  .ink-page [data-on="true"] > .ink-node,
+  .ink-page .ink-node[data-on="true"] { stroke: var(--color-gold); }
+  .ink-page .ink-hit { cursor: pointer; outline: none; }
+  .ink-page .ink-hit:focus-visible > .ink-node { stroke: var(--color-gold); stroke-width: 2; }
+  .ink-page .ink-lift { transition: transform 0.3s var(--ink-ease); transform-box: fill-box; transform-origin: center; }
+  .ink-page .ink-lift[data-on="true"] { transform: translateY(-2px); }
+
+  /* HTML pieces that share the look: square chips, meters, blocks. */
+  .ink-page .ink-chip {
+    border: 1px solid var(--ink-line);
+    background: var(--ink-raise);
+    transition: border-color 0.25s, background-color 0.25s;
+  }
+  .ink-page .ink-chip[data-on="true"],
+  .ink-page .ink-chip:hover { border-color: var(--color-gold); }
+  .ink-page .ink-chip[aria-pressed="true"] {
+    border-color: var(--color-gold);
+    background: color-mix(in oklch, var(--color-gold) 9%, var(--ink-raise));
+  }
+  .ink-page .ink-meter {
+    position: relative;
+    height: 10px;
+    border: 1px solid var(--ink-line-strong);
+    background: var(--color-ground);
+  }
+  .ink-page .ink-meter > .ink-meter-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: repeating-linear-gradient(135deg, var(--color-gold) 0 5px, color-mix(in oklch, var(--color-gold) 70%, transparent) 5px 10px);
+  }
+  .ink-page .ink-block { transition: opacity 0.25s, transform 0.35s var(--ink-ease); }
+
+  /* Native <details> used for "Details", styled to match. */
+  .ink-page .ink-details > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    list-style: none;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--color-ink-2);
+  }
+  .ink-page .ink-details > summary::-webkit-details-marker { display: none; }
+  .ink-page .ink-details > summary:hover { color: var(--color-ink); }
+  .ink-page .ink-details > summary .ink-chev { transition: transform 0.2s ease; }
+  .ink-page .ink-details[open] > summary .ink-chev { transform: rotate(90deg); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ink-page *,
+    .ink-page *::before,
+    .ink-page *::after {
+      transition: none !important;
+      animation: none !important;
+    }
+    .ink-page .ink-frame:hover > .ink-c { transform: none; }
+    .ink-page .ink-lift[data-on="true"] { transform: none; }
+  }
+}
