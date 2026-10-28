@@ -66,6 +66,8 @@ export interface ContractCoverage {
 export interface ImportReport {
   source_file: string
   source_sha256: string
+  /** The real MCX rows committed with the app, as opposed to a browser upload. */
+  bundled?: boolean
   size_bytes: number
   imported_at: string
   synthetic: boolean
@@ -122,6 +124,10 @@ export interface UploadResponse {
 
 export interface DatasetStatus {
   kind: DataKind
+  /** Every file held is the real MCX data bundled with the app. */
+  bundled: boolean
+  /** One-line description of the data held, e.g. "Real MCX Bhavcopy data · 23 and 27 Oct 2026 · …". */
+  source_label: string
   storage: string
   files: ImportReport[]
   observations: number

@@ -166,9 +166,28 @@ export function Disclosure({ summary, children }: { summary: ReactNode; children
   )
 }
 
-export function KindBadge({ kind }: { kind: 'empty' | 'user_uploaded' | 'synthetic' | undefined }) {
+export function KindBadge({
+  kind,
+  bundled,
+  label,
+  compact,
+}: {
+  kind: 'empty' | 'user_uploaded' | 'synthetic' | undefined
+  bundled?: boolean
+  label?: string
+  /** Header use: a narrow box that wraps the label over two or three lines. */
+  compact?: boolean
+}) {
   if (kind === 'synthetic') return <Pill tone="warn">Synthetic data — not market data</Pill>
-  if (kind === 'user_uploaded') return <Pill tone="info">User-uploaded data · origin unverified</Pill>
+  if (kind === 'user_uploaded' && bundled && label) {
+    // Long enough to wrap, so it is not a nowrap pill.
+    return (
+      <span className={`inline-block rounded-xl bg-good-soft px-2 py-0.5 text-right text-xs leading-snug font-medium text-good ${compact ? 'max-w-52' : ''}`}>
+        {label}
+      </span>
+    )
+  }
+  if (kind === 'user_uploaded') return <Pill tone="info">User-uploaded · origin unverified</Pill>
   return <Pill>No market data loaded</Pill>
 }
 

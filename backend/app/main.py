@@ -47,6 +47,11 @@ def create_app(
     if archive and app.state.settings.seed_dir:
         archive.seed_if_empty(app.state.settings.seed_dir)
     app.state.store = SessionStore.open(archive)
+    # Real data loaded from disk gets its research straight away, so no page waits for a run.
+    try:
+        research.run_with_assumptions(app.state.store)
+    except Exception:  # never block startup on research; the Research page can still run it
+        logger.exception("Startup research run failed")
 
     # Every route lives under /api so the Vite dev proxy can forward it unchanged.
     for module in (health, instruments, datasets, observations, research, package, analysis, validation):

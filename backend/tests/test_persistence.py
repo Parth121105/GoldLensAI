@@ -101,13 +101,15 @@ def test_clearing_the_session_deletes_the_saved_imports(tmp_path):
     assert app_over(tmp_path).get("/api/datasets").json()["kind"] == "empty"
 
 
-def test_research_is_not_saved_and_reruns_identically_after_a_restart(tmp_path):
+def test_research_reruns_automatically_and_identically_after_a_restart(tmp_path):
     first = app_over(tmp_path)
     upload(first, demo_csv_bytes(), "demo_as_real.csv")
     before = first.post("/api/research", json={"horizon": 3}).json()
 
     restarted = app_over(tmp_path)
-    assert restarted.get("/api/research").json() is None  # research results stay in memory
+    # Research results stay in memory; real data gets a fresh run with the assumed costs at startup.
+    auto = restarted.get("/api/research").json()
+    assert auto["config"]["horizon"] == 5 and auto["costs"]["round_trip_bps"] == 9.6
     after = restarted.post("/api/research", json={"horizon": 3}).json()
 
     strip = lambda r: {k: v for k, v in r.items() if k != "generated_at"}  # noqa: E731
@@ -227,3 +229,31 @@ def test_seed_holds_only_real_rows():
 
     loaded = ImportArchive(DEFAULT_SEED_DIR).load_all()
     assert len(loaded) == 2 and not any(r.report.synthetic for r in loaded)
+
+
+def test_real_uploads_get_research_without_a_run_and_synthetic_ones_do_not(tmp_path):
+    client = app_over(tmp_path / "store")
+    upload(client, LEGACY.read_bytes(), AS_REAL)
+    assert client.get("/api/research").json()["kind"] == "user_uploaded"
+
+    client.delete("/api/datasets")
+    client.post("/api/datasets/demo")
+    assert client.get("/api/research").json() is None  # synthetic research is left to the user
+
+
+def test_bundled_seed_files_are_labelled_real_and_browser_uploads_unverified(tmp_path):
+    seed = tmp_path / "seed"
+    upload(app_over(seed), LEGACY.read_bytes(), AS_REAL)  # builds a seed folder of one saved import
+    settings = Settings(store_dir=tmp_path / "store", seed_dir=seed)
+    client = TestClient(create_app(frontend_dist=None, settings=settings))
+
+    status = client.get("/api/datasets").json()
+    assert status["bundled"] is True and status["files"][0]["bundled"] is True
+    assert status["source_label"].startswith("Real MCX Bhavcopy data · ")
+    assert client.get("/api/research").json() is not None
+
+    upload(client, demo_csv_bytes(), "another_day.csv")
+    status = client.get("/api/datasets").json()
+    assert status["bundled"] is False
+    assert status["source_label"] == "User-uploaded · origin unverified"
+    assert [f["bundled"] for f in status["files"]] == [True, False]

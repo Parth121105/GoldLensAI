@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../api/client'
 import type { ContractCoverage, Observation } from '../api/types'
 import { BentoGrid, BentoTile } from '../components/Bento'
 import { GoldBento } from '../components/ui/gold-bento'
 import type { ResearchState } from '../components/ui/gold-bento'
 import { Button, ErrorNote } from '../components/ui'
-import { composition, instrumentCards, pairViews, priceSeries, recentSignals } from '../lib/bento-data'
+import { useRelativeValue, useTermStructure, useVerdict } from '../components/analysis/useAnalysis'
+import { composition, instrumentCards, pairViews, priceSeries, recentSignals, sameDayView } from '../lib/bento-data'
 import { count, day, monthTick } from '../lib/format'
 import { SYMBOL_ORDER } from '../lib/labels'
 import { navigate } from '../lib/router'
@@ -39,6 +40,10 @@ export function Overview() {
   const cards = useMemo(() => instrumentCards(instruments.data?.instruments ?? [], list ?? []), [instruments.data, list])
   const pairs = useMemo(() => (run ? pairViews(run) : []), [run])
   const signals = useMemo(() => (run ? recentSignals(run) : []), [run])
+  const relativeValue = useRelativeValue().data
+  const termStructure = useTermStructure().data
+  const neededDates = useVerdict().data?.needed_per_pair ?? null
+  const sameDay = useCallback((pairId: string) => sameDayView(pairId, relativeValue, termStructure), [relativeValue, termStructure])
 
   const researchState: ResearchState = research.loading && !run ? 'loading' : run ? 'ready' : 'none'
   const loading = (!status && !datasets.error) || (hasData && !list && !actionError)
@@ -71,6 +76,9 @@ export function Overview() {
         research={researchState}
         pairs={pairs}
         signals={signals}
+        sameDay={sameDay}
+        neededDates={neededDates}
+        bundled={status?.bundled}
         busy={busy}
         onLoadDemo={status?.kind === 'user_uploaded' ? undefined : () => void loadDemo()}
         onImport={() => navigate('/data')}

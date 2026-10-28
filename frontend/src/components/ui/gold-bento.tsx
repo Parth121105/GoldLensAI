@@ -5,8 +5,8 @@
 import { Activity, ArrowRight, BadgeCheck, CircleDot, Database, FlaskConical, Loader2, Sigma } from 'lucide-react'
 import * as React from 'react'
 import type { DataKind, PointStatus, Verdict } from '../../api/types'
-import type { Composition, InstrumentCard, PairView, PriceSeries, SignalView, SpreadPoint } from '../../lib/bento-data'
-import { contractLabel } from '../../lib/bento-data'
+import type { Composition, InstrumentCard, PairView, PriceSeries, SameDayView, SignalView, SpreadPoint } from '../../lib/bento-data'
+import { BASELINE_DATES, contractLabel } from '../../lib/bento-data'
 import { count, day, shortDay } from '../../lib/format'
 import { STATUSES } from '../../lib/labels'
 
@@ -26,6 +26,12 @@ export interface GoldBentoProps {
   research: ResearchState
   pairs: PairView[]
   signals: SignalView[]
+  /** The selected pair on the latest date, used until it has a baseline of BASELINE_DATES. */
+  sameDay: (pairId: string) => SameDayView | null
+  /** Eligible dates per pair a walk-forward verdict needs. */
+  neededDates: number | null
+  /** Real data held: the bundled MCX files (true) or browser uploads (false). */
+  bundled?: boolean
   busy?: boolean
   onLoadDemo?: () => void
   onImport: () => void
@@ -188,6 +194,13 @@ function Skeleton({ className }: { className: string }) {
   return <span aria-hidden className={cx('block rounded-xl bg-muted', className)} />
 }
 
+/** One plain line under an early, same-day view: what more history unlocks. */
+function MoreData({ children }: { children: React.ReactNode }) {
+  return <p className="mt-auto border-t border-border pt-3 text-[12px] leading-relaxed text-muted-foreground">{children}</p>
+}
+
+const needsDates = (what: string, loaded: number) => `${what} needs about ${BASELINE_DATES} trading days; ${loaded} loaded.`
+
 /* ------------------------------------------------------------------ */
 /*  Hero: latest close + daily change bars                             */
 /* ------------------------------------------------------------------ */
@@ -224,7 +237,7 @@ function HeroTile({ price, loading, reduced, empty }: { price: PriceSeries | nul
                 {sign(change)}
                 {inr(Math.abs(change))} ({signed(pct)}%)
               </span>
-              <span className="text-muted-foreground"> · {daily.length} sessions</span>
+              <span className="text-muted-foreground"> · {daily.length} {daily.length === 1 ? 'session' : 'sessions'}</span>
             </p>
           </div>
         )}
@@ -461,6 +474,31 @@ const arcPoint = (t: number, r: number) => {
   return [75 + r * Math.cos(a), 78 - r * Math.sin(a)] as const
 }
 
+function SameDayDeviationTile({ early }: { early: SameDayView }) {
+  const r = early.maxResidual
+  return (
+    <Tile title="Same-day deviation (1 day of data)" className="lg:col-start-4 lg:row-start-1">
+      <div className="flex flex-1 flex-col justify-center gap-4">
+        <div>
+          <p className="font-mono text-[26px] leading-none font-semibold tabular-nums">
+            {early.gap.adjusted == null ? '—' : signed(early.gap.adjusted)} <span className="text-sm text-muted-foreground">bps</span>
+          </p>
+          <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">Carry-adjusted gap · {shortDay(early.date)} · {early.gap.legs}</p>
+        </div>
+        <div>
+          <p className="font-mono text-[20px] leading-none font-semibold tabular-nums">
+            {r ? signed(r.bps) : '—'} <span className="text-sm text-muted-foreground">bps</span>
+          </p>
+          <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">
+            Largest distance of any expiry from its carry line{r ? ` · ${r.label}` : ''}
+          </p>
+        </div>
+      </div>
+      <MoreData>{needsDates("A z-score against the pair's normal gap", early.datesLoaded)}</MoreData>
+    </Tile>
+  )
+}
+
 function GaugeTile({ pair, threshold, onThreshold, empty }: { pair: PairView | null; threshold: number; onThreshold: (z: number) => void; empty: React.ReactNode }) {
   const point = pair ? lastScored(pair.points) : null
   const z = point?.z ?? 0
@@ -526,6 +564,75 @@ function GaugeTile({ pair, threshold, onThreshold, empty }: { pair: PairView | n
 /* ------------------------------------------------------------------ */
 
 type Range = '1M' | 'All'
+
+const bps = (v: number | null) => (v == null ? '—' : `${signed(v)} bps`)
+
+function SameDayChartTile({ early }: { early: SameDayView }) {
+  const cur = early.history.at(-1)
+  return (
+    <Tile
+      title={`Gap by date · ${early.gap.legs}`}
+      className="sm:col-span-2 lg:col-span-2 lg:col-start-1 lg:row-span-2 lg:row-start-2"
+    >
+      <div className="flex flex-wrap items-end gap-x-8 gap-y-2">
+        <div>
+          <p className="text-[12px] text-muted-foreground">Raw gap</p>
+          <p className="mt-1 font-mono text-[22px] font-semibold tabular-nums">
+            {cur ? signed(cur.raw) : '—'} <span className="text-[13px] text-muted-foreground">bps</span>
+          </p>
+        </div>
+        <div>
+          <p className="text-[12px] text-muted-foreground">Carry-adjusted</p>
+          <p className="mt-1 font-mono text-[22px] font-semibold tabular-nums" style={{ color: ACCENT }}>
+            {cur?.adjusted == null ? '—' : signed(cur.adjusted)} <span className="text-[13px] text-muted-foreground">bps</span>
+          </p>
+        </div>
+        <span className="ml-auto rounded-full bg-muted px-2.5 py-1 font-mono text-[11px] font-semibold text-muted-foreground">
+          {shortDay(early.date)} · no baseline yet
+        </span>
+      </div>
+
+      <table className="mt-5 w-full text-[13px]">
+        <caption className="sr-only">The same two contracts on each loaded date</caption>
+        <thead>
+          <tr className="text-left text-[11px] text-muted-foreground">
+            <th scope="col" className="pb-1.5 font-normal">Date</th>
+            <th scope="col" className="pb-1.5 text-right font-normal">Raw</th>
+            <th scope="col" className="pb-1.5 text-right font-normal">Carry-adjusted</th>
+          </tr>
+        </thead>
+        <tbody className="font-mono tabular-nums">
+          {early.history.map((h) => (
+            <tr key={h.date} className="border-t border-border">
+              <td className="py-1.5">{day(h.date)}</td>
+              <td className="py-1.5 text-right">{bps(h.raw)}</td>
+              <td className="py-1.5 text-right">{bps(h.adjusted)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <p className="mt-5 text-[12px] font-medium text-muted-foreground">Every expiry pairing · {shortDay(early.date)}</p>
+      <ul className="mt-1.5 space-y-1 text-[12px]">
+        {early.gaps.map((g) => (
+          <li key={g.legs} className="flex items-baseline justify-between gap-3">
+            <span className="min-w-0 truncate">
+              {g.legs}
+              {!g.tradeable && <span className="text-muted-foreground"> · in expiry buffer</span>}
+            </span>
+            <span className="shrink-0 font-mono tabular-nums">{bps(g.adjusted)}</span>
+          </li>
+        ))}
+      </ul>
+      {early.gap.locationBasis && (
+        <p className="mt-3 text-[12px] text-muted-foreground">GOLDPETAL is priced in Mumbai, the others in Ahmedabad; these gaps include that location basis.</p>
+      )}
+      <div className="mt-auto pt-4">
+        <MoreData>{needsDates("The pair's normal gap, and a chart of the spread against it,", early.datesLoaded)}</MoreData>
+      </div>
+    </Tile>
+  )
+}
 
 function ChartTile({ pair, threshold, reduced, empty }: { pair: PairView | null; threshold: number; reduced: boolean; empty: React.ReactNode }) {
   const uid = React.useId().replace(/:/g, '')
@@ -737,12 +844,14 @@ function VerdictTile({
   pair,
   research,
   hasData,
+  neededDates,
   onOpenEvidence,
   onRunResearch,
 }: {
   pair: PairView | null
   research: ResearchState
   hasData: boolean
+  neededDates: number | null
   onOpenEvidence: () => void
   onRunResearch: () => void
 }) {
@@ -760,11 +869,33 @@ function VerdictTile({
         <h3 className="text-[13px] font-semibold opacity-75">Verdict</h3>
         <span className="flex items-center gap-1.5 rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold" style={{ background: tint(12) }}>
           <span className="size-1.5 rounded-full" style={{ background: v?.negative ? 'oklch(0.5 0.17 28)' : INK }} aria-hidden />
-          {research === 'loading' ? 'Loading' : v ? v.label : 'Not run'}
+          {research === 'loading' ? 'Loading' : v ? v.label : hasData ? 'Not run' : 'No data'}
         </span>
       </header>
 
-      {!pair || !h ? (
+      {pair && !h && research === 'ready' ? (
+        <div className="flex flex-1 flex-col">
+          <p className="mt-5 font-mono text-[52px] leading-none font-semibold tracking-[-0.05em] tabular-nums">
+            {pair.eligibleDates}
+            <span className="text-[22px]">/{neededDates ?? '—'}</span>
+          </p>
+          <p className="mt-1 text-[12px] font-medium opacity-70">eligible dates · {pair.label}</p>
+          <p className="mt-5 text-[13px] leading-relaxed font-medium opacity-80">
+            Research has run on the loaded data. A walk-forward verdict needs {neededDates ?? 'several hundred'} eligible dates per pair:
+            three training folds and a 30% holdout, each able to hold {pair.minEvents} separate signals. Until then no edge is claimed.
+          </p>
+          <div className="mt-auto pt-6">
+            <button
+              type="button"
+              onClick={onOpenEvidence}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold transition-transform focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none active:scale-[0.98]"
+              style={{ background: INK, color: ACCENT }}
+            >
+              Open evidence <ArrowRight className="size-4" aria-hidden />
+            </button>
+          </div>
+        </div>
+      ) : !pair || !h ? (
         <div className="flex flex-1 flex-col">
           <p className="mt-5 font-mono text-[52px] leading-none font-semibold tracking-[-0.05em]">—</p>
           <p className="mt-3 text-[13px] leading-relaxed font-medium opacity-80">
@@ -862,6 +993,42 @@ function VerdictTile({
 /*  Normal band: baseline ± threshold vs today's spread                */
 /* ------------------------------------------------------------------ */
 
+function SameDayRangeTile({ early }: { early: SameDayView }) {
+  const values = early.gaps.flatMap((g) => (g.adjusted == null ? [] : [g.adjusted]))
+  const lo = Math.min(...values)
+  const hi = Math.max(...values)
+  const pad = Math.max(1, (hi - lo) * 0.15)
+  const pos = (v: number) => ((v - (lo - pad)) / (hi - lo + 2 * pad)) * 100
+  return (
+    <Tile title={`Same-day range · ${shortDay(early.date)}`} className="lg:col-start-3 lg:row-start-3">
+      {values.length === 0 ? (
+        <p className="text-[13px] text-muted-foreground">No carry-adjusted gap could be computed for this pair on {day(early.date)}.</p>
+      ) : (
+        <>
+          <p className="font-mono text-[22px] font-semibold tabular-nums">
+            {signed(lo)} to {signed(hi)} <span className="text-[13px] text-muted-foreground">bps</span>
+          </p>
+          <p className="font-mono text-[11px] text-muted-foreground">carry-adjusted · {values.length} expiry pairings</p>
+          <div className="relative mt-5 h-8" role="img" aria-label={`Carry-adjusted gaps from ${signed(lo)} to ${signed(hi)} bps`}>
+            <div className="absolute inset-x-0 top-1/2 h-[2px] -translate-y-1/2 rounded-full bg-muted" />
+            {early.gaps.map((g) =>
+              g.adjusted == null ? null : (
+                <span
+                  key={g.legs}
+                  title={`${g.legs}: ${signed(g.adjusted)} bps`}
+                  className="absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card"
+                  style={{ left: `${pos(g.adjusted)}%`, background: g === early.gap ? ACCENT : 'var(--color-muted-foreground)' }}
+                />
+              ),
+            )}
+          </div>
+        </>
+      )}
+      <MoreData>{needsDates('A normal band', early.datesLoaded)}</MoreData>
+    </Tile>
+  )
+}
+
 function BandTile({ pair, threshold, empty }: { pair: PairView | null; threshold: number; empty: React.ReactNode }) {
   const p = pair ? lastScored(pair.points) : null
   if (!pair || !p || p.baseline == null || p.std == null) {
@@ -932,6 +1099,62 @@ function BandTile({ pair, threshold, empty }: { pair: PairView | null; threshold
 /*  Daily deviation stream                                             */
 /* ------------------------------------------------------------------ */
 
+function PairCounts({ pair }: { pair: PairView }) {
+  return (
+    <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-3">
+      {[
+        ['Eligible dates', count(pair.eligibleDates)],
+        ['Excluded dates', count(pair.excludedDates)],
+        ['Missing a leg', count(pair.missingLegDates)],
+      ].map(([k, val]) => (
+        <div key={k} className="min-w-0">
+          <dt className="text-[11px] text-muted-foreground">{k}</dt>
+          <dd className="mt-0.5 font-mono text-[13px] font-semibold tabular-nums">{val}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+function SameDayResidualTile({ early, pair }: { early: SameDayView; pair: PairView }) {
+  const [hover, setHover] = React.useState<number | null>(null)
+  const rs = early.residuals
+  const maxAbs = Math.max(1, ...rs.map((r) => Math.abs(r.bps)))
+  const symbols = [...new Set(rs.map((r) => r.symbol))]
+  return (
+    <Tile
+      title="Distance from carry line"
+      className="sm:col-span-2 lg:col-span-2 lg:col-start-1 lg:row-start-4"
+      action={<span className="font-mono text-[11px] text-muted-foreground">{shortDay(early.date)}</span>}
+    >
+      <p className="font-mono text-[11px] text-muted-foreground tabular-nums" aria-live="polite">
+        {hover !== null ? `${rs[hover].label} · ${signed(rs[hover].bps)} bps` : `${symbols.map((s, i) => `${s} ${i === 0 ? 'gold' : 'grey'}`).join(' · ')} · above or below its own fitted curve, up to ${maxAbs.toFixed(1)} bps`}
+      </p>
+      <div className="relative mt-3 flex h-20 items-stretch gap-[3px]" onPointerLeave={() => setHover(null)} role="img" aria-label={rs.map((r) => `${r.label} ${signed(r.bps)} bps`).join(', ')}>
+        <span aria-hidden className="absolute inset-x-0 top-1/2 h-px bg-border" />
+        {rs.map((r, i) => {
+          const h = (Math.abs(r.bps) / maxAbs) * 50
+          return (
+            <span key={r.contract} className="relative flex-1" onPointerEnter={() => setHover(i)} aria-hidden>
+              <span
+                className="absolute inset-x-0 rounded-[3px]"
+                style={{
+                  height: `${Math.max(2, h)}%`,
+                  ...(r.bps >= 0 ? { bottom: '50%' } : { top: '50%' }),
+                  background: r.symbol === symbols[0] ? ACCENT : 'var(--color-muted-foreground)',
+                  opacity: hover === null || hover === i ? 0.9 : 0.3,
+                }}
+              />
+            </span>
+          )
+        })}
+      </div>
+      <PairCounts pair={pair} />
+      <MoreData>{needsDates('A daily z-score for the pair', early.datesLoaded)}</MoreData>
+    </Tile>
+  )
+}
+
 function StreamTile({ pair, threshold, reduced, empty }: { pair: PairView | null; threshold: number; reduced: boolean; empty: React.ReactNode }) {
   const mounted = useMounted()
   const bars = (pair?.points ?? []).filter((p) => p.z != null).slice(-42)
@@ -980,18 +1203,7 @@ function StreamTile({ pair, threshold, reduced, empty }: { pair: PairView | null
               )
             })}
           </div>
-          <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-3">
-            {[
-              ['Eligible dates', count(pair.eligibleDates)],
-              ['Excluded dates', count(pair.excludedDates)],
-              ['Missing a leg', count(pair.missingLegDates)],
-            ].map(([k, val]) => (
-              <div key={k} className="min-w-0">
-                <dt className="text-[11px] text-muted-foreground">{k}</dt>
-                <dd className="mt-0.5 font-mono text-[13px] font-semibold tabular-nums">{val}</dd>
-              </div>
-            ))}
-          </dl>
+          <PairCounts pair={pair} />
         </>
       )}
     </Tile>
@@ -1072,6 +1284,9 @@ export function GoldBento({
   research,
   pairs,
   signals,
+  sameDay,
+  neededDates,
+  bundled = false,
   busy = false,
   onLoadDemo,
   onImport,
@@ -1082,6 +1297,9 @@ export function GoldBento({
   const reduced = useReducedMotion()
   const [pairId, setPairId] = React.useState<string | null>(null)
   const pair = pairs.find((p) => p.id === pairId) ?? pairs[0] ?? null
+  // Until the pair has a baseline, the tiles show what the loaded days support on their own.
+  const scored = !!pair && pair.eligibleDates >= BASELINE_DATES && lastScored(pair.points) != null
+  const early = pair && !scored ? sameDay(pair.id) : null
   // The threshold the user picked, kept only while the same pair is selected.
   const [override, setOverride] = React.useState<{ pair: string; z: number } | null>(null)
   const threshold = pair && override?.pair === pair.id ? override.z : (pair?.zThreshold ?? 2)
@@ -1152,7 +1370,7 @@ export function GoldBento({
             MCX
           </span>
           <span className="rounded-full bg-foreground px-3 py-1.5 font-mono text-[12px] font-semibold text-background">
-            {kind ? KIND_LABEL[kind] : loading ? 'Loading…' : 'Offline'}
+            {kind ? (kind === 'user_uploaded' && bundled ? 'Real MCX data' : KIND_LABEL[kind]) : loading ? 'Loading…' : 'Offline'}
           </span>
         </div>
       </nav>
@@ -1160,13 +1378,32 @@ export function GoldBento({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <HeroTile price={price} loading={loading} reduced={reduced} empty={noData} />
         <CardsTile key={instruments.map((c) => c.symbol).join() + (price?.symbol ?? '')} cards={instruments} front={price?.symbol} reduced={reduced} />
-        <GaugeTile pair={pair} threshold={threshold} onThreshold={(z) => pair && setOverride({ pair: pair.id, z })} empty={researchEmpty} />
-        <ChartTile pair={pair} threshold={threshold} reduced={reduced} empty={researchEmpty} />
+        {early ? (
+          <SameDayDeviationTile early={early} />
+        ) : (
+          <GaugeTile pair={pair} threshold={threshold} onThreshold={(z) => pair && setOverride({ pair: pair.id, z })} empty={researchEmpty} />
+        )}
+        {early ? <SameDayChartTile early={early} /> : <ChartTile pair={pair} threshold={threshold} reduced={reduced} empty={researchEmpty} />}
         <CompositionTile composition={composition} empty={loading ? <Skeleton className="min-h-24 w-full flex-1" /> : quiet('No observations imported yet.')} />
-        <VerdictTile pair={pair} research={loading ? 'loading' : research} hasData={hasData} onOpenEvidence={onOpenEvidence} onRunResearch={onRunResearch} />
-        <BandTile pair={pair} threshold={threshold} empty={researchEmpty} />
-        <StreamTile pair={pair} threshold={threshold} reduced={reduced} empty={researchEmpty} />
-        <SignalsTile signals={signals} empty={research === 'ready' && pairs.length > 0 ? quiet('No dates were flagged in this run.') : researchEmpty} />
+        <VerdictTile pair={pair} research={loading ? 'loading' : research} hasData={hasData} neededDates={neededDates} onOpenEvidence={onOpenEvidence} onRunResearch={onRunResearch} />
+        {early ? <SameDayRangeTile early={early} /> : <BandTile pair={pair} threshold={threshold} empty={researchEmpty} />}
+        {early && pair ? (
+          <SameDayResidualTile early={early} pair={pair} />
+        ) : (
+          <StreamTile pair={pair} threshold={threshold} reduced={reduced} empty={researchEmpty} />
+        )}
+        <SignalsTile
+          signals={signals}
+          empty={
+            research === 'ready' && pairs.length > 0
+              ? quiet(
+                  early
+                    ? `No dates flagged. ${needsDates("A flag needs the pair's normal gap, which", early.datesLoaded)}`
+                    : 'No dates were flagged in this run.',
+                )
+              : researchEmpty
+          }
+        />
       </div>
     </div>
   )

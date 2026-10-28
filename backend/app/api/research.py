@@ -32,7 +32,8 @@ from app.research import CostModel, MixedDataError, ResearchConfig, run_research
 from app.research.pairs import Leg, PairSeries
 from app.research.signals import Assessment, PointStatus, assess_series
 from app.research.validation import OutcomeStats, PairValidation, WindowResult
-from app.store import SessionStore
+from app.assumptions import cost_model
+from app.store import DataKind, SessionStore
 
 router = APIRouter(tags=["research"])
 
@@ -75,6 +76,22 @@ def latest(store: SessionStore = Depends(get_store)) -> ResearchResponse | None:
     if store.research is None:
         return None
     return ResearchResponse.model_validate(store.research)
+
+
+def run_with_assumptions(store: SessionStore) -> bool:
+    """Run research on real data with the default settings and the assumed costs, and keep it.
+
+    Called at startup and after each real-data upload, so real data is never shown without
+    research. Synthetic sessions are left to the user. Returns True if a result was saved.
+    """
+    imports = store.snapshot()
+    if not imports or store.kind is not DataKind.USER_UPLOADED:
+        return False
+    try:
+        response = _run(imports, ResearchConfig(costs=cost_model()), store.kind.value)
+    except MixedDataError:
+        return False
+    return store.save_research(response.model_dump(mode="json"), imports)
 
 
 def _run(imports, config: ResearchConfig, kind: str) -> ResearchResponse:

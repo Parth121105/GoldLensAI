@@ -58,7 +58,7 @@ export function Shell({ children }: { children: ReactNode }) {
                 Server unreachable
               </span>
             ) : (
-              <KindBadge kind={kind} />
+              <KindBadge kind={kind} bundled={datasets.data?.bundled} label={datasets.data?.source_label} compact />
             )}
           </div>
         </div>

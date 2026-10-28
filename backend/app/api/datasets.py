@@ -12,12 +12,14 @@ import csv
 import functools
 import hashlib
 from collections import Counter, defaultdict
-from pathlib import PurePosixPath
+from datetime import date
+from pathlib import Path, PurePosixPath
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import get_settings, get_store
+from app.api.research import run_with_assumptions
 from app.api.schemas import (
     ContractCoverageOut,
     DatasetStatus,
@@ -39,7 +41,7 @@ from app.ingestion.package import (
 from app.research.engine import merge_observations
 from app.settings import Settings
 from app.specs import default_registry
-from app.store import AlreadyHeldError, SessionStore, StoreError
+from app.store import AlreadyHeldError, DataKind, SessionStore, StoreError
 
 router = APIRouter(tags=["datasets"])
 
@@ -85,9 +87,14 @@ async def upload_dataset(
     if not data.strip():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"{name} is empty.")
     if _is_package_table(data):
-        return await run_in_threadpool(_store_package, data, name, store, settings)
-    result = await run_in_threadpool(_import, data, name, date_order)
-    return _store(result, store, settings)
+        response = await run_in_threadpool(_store_package, data, name, store, settings)
+    else:
+        result = await run_in_threadpool(_import, data, name, date_order)
+        response = _store(result, store, settings)
+    # Real data is never left without research: run it again on the new set of files.
+    if store.kind is DataKind.USER_UPLOADED and store.research is None:
+        await run_in_threadpool(run_with_assumptions, store)
+    return response
 
 
 @router.post("/datasets/demo", response_model=UploadResponse)
@@ -113,14 +120,19 @@ def build_status(store: SessionStore, settings: Settings) -> DatasetStatus:
     imports = store.snapshot()
     observations, conflicts = merge_observations(imports)
     dates = sorted({o.trade_date for o in observations})
+    seeds = _bundled_shas(settings.seed_dir)
+    bundled = bool(imports) and all(r.report.source_sha256 in seeds for r in imports)
+    contracts = _contracts(observations)
     return DatasetStatus(
         kind=store.kind.value,
+        bundled=bundled,
+        source_label=_source_label(store.kind, bundled, dates, contracts),
         storage=STORAGE_NOTE_SAVED if store.persistent else STORAGE_NOTE,
-        files=[report_out(r, _provenance(r)) for r in imports],
+        files=[report_out(r, _provenance(r, seeds), bundled=r.report.source_sha256 in seeds) for r in imports],
         observations=len(observations),
         trade_date_from=dates[0] if dates else None,
         trade_date_to=dates[-1] if dates else None,
-        contracts=_contracts(observations),
+        contracts=contracts,
         cross_file_conflicts=conflicts,
         limits={
             "max_upload_bytes": settings.max_upload_bytes,
@@ -216,7 +228,7 @@ def _store_package(data: bytes, name: str, store: SessionStore, settings: Settin
     return UploadResponse(stored=True, message=message, report=report, package=package_out(table))
 
 
-def report_out(result: ImportResult, provenance: str) -> ImportReportOut:
+def report_out(result: ImportResult, provenance: str, *, bundled: bool = False) -> ImportReportOut:
     r = result.report
     kinds: Counter[str] = Counter()
     for obs in result.observations:
@@ -228,6 +240,7 @@ def report_out(result: ImportResult, provenance: str) -> ImportReportOut:
         size_bytes=r.size_bytes,
         imported_at=r.imported_at,
         synthetic=r.synthetic,
+        bundled=bundled,
         provenance=provenance,
         layout_id=r.layout_id,
         layout_verified_against_real_file=r.layout_verified_against_real_file,
@@ -281,7 +294,43 @@ def _demo_sha256() -> str:
     return hashlib.sha256(demo_csv_bytes()).hexdigest()
 
 
-def _provenance(result: ImportResult) -> str:
+@functools.cache
+def _bundled_shas(seed_dir: Path | None) -> frozenset[str]:
+    """SHA-256 of each real Bhavcopy bundled with the app; the seed files are named by it."""
+    if seed_dir is None or not seed_dir.is_dir():
+        return frozenset()
+    return frozenset(p.stem for p in seed_dir.glob("*.json"))
+
+
+def _dates_phrase(dates: list[date]) -> str:
+    """'23 and 27 Oct 2026' for up to three dates, otherwise the count and the range."""
+    def full(d: date) -> str:
+        return f"{d.day} {d:%b %Y}"
+
+    if len(dates) > 3:
+        return f"{len(dates)} trading days, {full(dates[0])} – {full(dates[-1])}"
+    if len({(d.year, d.month) for d in dates}) == 1:
+        days = [str(d.day) for d in dates]
+        joined = days[0] if len(days) == 1 else ", ".join(days[:-1]) + " and " + days[-1]
+        return f"{joined} {dates[0]:%b %Y}"
+    return " and ".join(full(d) for d in dates)
+
+
+def _source_label(kind: DataKind, bundled: bool, dates: list[date], contracts: list[ContractCoverageOut]) -> str:
+    if kind is DataKind.EMPTY:
+        return "No market data loaded"
+    if kind is DataKind.SYNTHETIC:
+        return "Synthetic data · not market data"
+    if bundled:
+        verified = " · specs verified from MCX PDFs" if all(c.spec_status == "verified" for c in contracts) else ""
+        return f"Real MCX Bhavcopy data · {_dates_phrase(dates)}{verified}"
+    return "User-uploaded · origin unverified"
+
+
+def _provenance(result: ImportResult, bundled: frozenset[str] = frozenset()) -> str:
+    if result.report.source_sha256 in bundled:
+        return ("Real MCX Bhavcopy (MCX date-wise download), bundled with Gold Lens and loaded at startup. "
+                "Contract specifications verified from the official MCX PDFs.")
     # The demo is recognised by its exact bytes, not its name: a user file that happens
     # to be called SYNTHETIC_demo_dataset.csv is labelled by the prefix rule below.
     if result.report.source_file == DEMO_FILENAME and result.report.source_sha256 == _demo_sha256():

@@ -41,7 +41,7 @@ export function Research() {
               </span>
             </span>
           ) : (
-            !unavailable && <Pill>Not run yet</Pill>
+            !unavailable && <Pill>{research.loading ? 'Loading research' : hasData ? 'Not run on this data' : 'No data loaded'}</Pill>
           )
         }
       />
@@ -243,8 +243,12 @@ function RunForm() {
   return (
     <DiagramCard
       className="lg:col-span-7"
-      title="Run research"
-      description="Spread anomalies and walk-forward validation, computed by the backend over every comparable contract pair."
+      title={previous ? 'Run again with other settings' : 'Run research'}
+      description={
+        previous
+          ? 'Real data is researched automatically with the default horizon and the assumed costs. Change them here to run it again.'
+          : 'Spread anomalies and walk-forward validation, computed by the backend over every comparable contract pair.'
+      }
     >
       <form onSubmit={(e) => void submit(e)} className="space-y-5">
         <label className="block text-[13px] font-medium text-ink">
@@ -465,11 +469,13 @@ function reported(p: PairResult, s: OutcomeStats | undefined, f: (s: OutcomeStat
 
 function PairDetail({ pair, run }: { pair: PairResult; run: ResearchResponse }) {
   const v = VERDICTS[pair.verdict]
-  // Open on the series where the final holdout begins, so the HOLDOUT divider is in view.
+  // Open on the series where the final holdout begins, so the HOLDOUT divider is in view;
+  // without a holdout, on the series with the most eligible dates.
   const [seriesId, setSeriesId] = useState(() => {
     const from = pair.holdout_from
     const hit = from ? pair.series.find((x) => x.points.some((pt) => pt.trade_date >= from) && x.points[0]?.trade_date <= from) : undefined
-    return (hit ?? pair.series[0])?.pair_id ?? null
+    const fullest = pair.series.reduce<(typeof pair.series)[number] | undefined>((a, b) => (!a || b.eligible_dates > a.eligible_dates ? b : a), undefined)
+    return (hit ?? fullest)?.pair_id ?? null
   })
   const series = pair.series.find((s) => s.pair_id === seriesId) ?? pair.series[0]
 
@@ -565,6 +571,7 @@ function PairDetail({ pair, run }: { pair: PairResult; run: ResearchResponse }) 
       {series && (
         <SpreadView
           series={series}
+          baselineWindow={pair.display_params.baseline_window}
           holdoutFrom={pair.holdout_from}
           findings={pair.findings.filter((f) => f.pair_id === series.pair_id)}
           unknownCosts={run.costs.round_trip_bps == null}
@@ -594,8 +601,10 @@ function SpreadView({
   findings,
   unknownCosts,
   picker,
+  baselineWindow,
 }: {
   series: Series
+  baselineWindow: number
   holdoutFrom: string | null
   findings: Finding[]
   unknownCosts: boolean
@@ -652,6 +661,12 @@ function SpreadView({
               <li className="flex items-center gap-1.5"><span aria-hidden="true" className="inline-block h-2.5 w-4 border-l border-dashed border-gold bg-gold/10" />Final holdout</li>
             </ul>
             <SpreadChart series={series} holdoutFrom={holdoutFrom} />
+            {series.eligible_dates <= baselineWindow && (
+              <p className="text-[13px] text-ink-2">
+                {count(series.eligible_dates)} eligible {series.eligible_dates === 1 ? 'date' : 'dates'}, so there is no trailing baseline yet: it
+                starts after {baselineWindow} eligible dates, and the pair's normal gap needs about 20.
+              </p>
+            )}
           </>
         )}
       </DiagramCard>

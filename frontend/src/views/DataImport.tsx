@@ -210,7 +210,7 @@ export function DataImport() {
           className="lg:col-span-5"
           title="Session"
           description="Files held in this session and how much of its allowance they use."
-          actions={status && <KindBadge kind={status.kind} />}
+          actions={status && <KindBadge kind={status.kind} bundled={status.bundled} label={status.source_label} />}
           detailsSummary="Where the data is kept"
           details={status && <p>{status.storage}</p>}
         >
@@ -300,7 +300,7 @@ export function DataImport() {
             <Button onClick={() => void run(api.loadDemo)} disabled={busy || status?.kind === 'user_uploaded'}>
               Load synthetic demo
             </Button>
-            {status?.kind === 'user_uploaded' && <p className="text-xs text-ink-3">Unavailable while uploaded files are in the session.</p>}
+            {status?.kind === 'user_uploaded' && <p className="text-xs text-ink-3">Unavailable while real market data is loaded. Synthetic and real data are never mixed.</p>}
           </div>
         </DiagramCard>
 
@@ -714,7 +714,7 @@ function Report({ report: r }: { report: ImportReport }) {
     <article className="ink-chip space-y-3 p-4">
       <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h3 className="text-[14px] font-semibold break-all">{r.source_file}</h3>
-        {r.synthetic ? <Pill tone="warn">Synthetic</Pill> : <Pill tone="info">User upload</Pill>}
+        {r.synthetic ? <Pill tone="warn">Synthetic</Pill> : r.bundled ? <Pill tone="good">Real MCX data · bundled</Pill> : <Pill tone="info">User upload · origin unverified</Pill>}
         <span className="text-xs text-ink-3">
           {bytes(r.size_bytes)} · imported {timestamp(r.imported_at)} · SHA-256 {r.source_sha256.slice(0, 12)}…
         </span>

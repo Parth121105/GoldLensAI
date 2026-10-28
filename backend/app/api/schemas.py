@@ -95,6 +95,8 @@ class ImportReportOut(BaseModel):
     size_bytes: int
     imported_at: datetime
     synthetic: bool
+    # True for the real MCX Bhavcopy rows committed with the app (backend/data/seed/store).
+    bundled: bool = False
     provenance: str = Field(description="How the file reached the app; never 'official' unless verified")
     layout_id: str
     layout_verified_against_real_file: bool
@@ -150,6 +152,10 @@ class UploadResponse(BaseModel):
 
 class DatasetStatus(BaseModel):
     kind: str = Field(description="empty | user_uploaded | synthetic")
+    # True when every file held is the real MCX data bundled with the app.
+    bundled: bool = False
+    # One-line description of the data held, for page headers.
+    source_label: str = ""
     storage: str
     files: list[ImportReportOut]
     observations: int

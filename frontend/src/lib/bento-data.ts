@@ -8,10 +8,13 @@ import type {
   Instrument,
   Observation,
   OutcomeStats,
+  PairGap,
   PairResult,
   PointStatus,
+  RelativeValueResponse,
   ResearchResponse,
   Series,
+  TermStructureResponse,
   Verdict,
 } from '../api/types'
 import { monthTick } from './format'
@@ -228,4 +231,74 @@ export function recentSignals(run: ResearchResponse, limit = 4): SignalView[] {
       deviation: f.deviation_bps,
       netEdge: f.net_edge_bps,
     }))
+}
+
+// --- Same-day view: what one or two days of real data support, before any baseline exists ---
+
+/** Eligible dates a pair needs before its normal gap (and a z-score against it) means anything. */
+export const BASELINE_DATES = 20
+
+export interface GapView {
+  legs: string
+  contractA: string
+  contractB: string
+  raw: number
+  /** Gap with the carry over the expiry difference removed; same-expiry pairs need no adjustment. */
+  adjusted: number | null
+  tradeable: boolean
+  locationBasis: boolean
+}
+
+export interface SameDayView {
+  date: string
+  datesLoaded: number
+  /** The pairing shown: the nearest expiries outside the pre-expiry buffer, if any. */
+  gap: GapView
+  /** Every expiry pairing of the two contracts on the date. */
+  gaps: GapView[]
+  /** The shown pairing on each loaded date. */
+  history: { date: string; raw: number; adjusted: number | null }[]
+  /** Each expiry's distance from its own contract's fitted carry line on the date. */
+  residuals: { contract: string; label: string; symbol: string; bps: number }[]
+  maxResidual: { label: string; bps: number } | null
+}
+
+const legLabel = (contractId: string) => {
+  const [symbol, ...date] = contractId.split('-')
+  return contractLabel(symbol, date.join('-'))
+}
+
+function gapView(p: PairGap): GapView {
+  return {
+    legs: `${legLabel(p.contract_a)} · ${legLabel(p.contract_b)}`,
+    contractA: p.contract_a,
+    contractB: p.contract_b,
+    raw: p.gap_bps,
+    adjusted: p.carry_adjusted_gap_bps ?? (p.expiry_gap_days === 0 ? p.gap_bps : null),
+    tradeable: p.tradeable,
+    locationBasis: p.location_basis != null,
+  }
+}
+
+/** The selected symbol pair on the latest trade date, from the backend's relative-value and curve fits. */
+export function sameDayView(pairId: string, rv: RelativeValueResponse | null, ts: TermStructureResponse | null): SameDayView | null {
+  const latest = rv?.days.at(-1)
+  if (!rv || !latest) return null
+  const [a, b] = pairId.split('/')
+  const gaps = latest.pairs.filter((p) => p.symbol_a === a && p.symbol_b === b).map(gapView)
+  const gap = gaps.find((g) => g.tradeable) ?? gaps[0]
+  if (!gap) return null
+  const history = rv.days.flatMap((d) =>
+    d.pairs
+      .filter((p) => p.contract_a === gap.contractA && p.contract_b === gap.contractB)
+      .map((p) => ({ date: d.trade_date, raw: p.gap_bps, adjusted: gapView(p).adjusted })),
+  )
+  const residuals = (ts?.curves ?? [])
+    .filter((c) => c.trade_date === latest.trade_date && (c.symbol === a || c.symbol === b))
+    .flatMap((c) => c.points.map((pt) => ({ contract: pt.contract_id, label: legLabel(pt.contract_id), symbol: c.symbol, bps: pt.residual_bps })))
+  const maxResidual = residuals.reduce<SameDayView['maxResidual']>(
+    (m, r) => (!m || Math.abs(r.bps) > Math.abs(m.bps) ? { label: r.label, bps: r.bps } : m),
+    null,
+  )
+  return { date: latest.trade_date, datesLoaded: rv.days.length, gap, gaps, history, residuals, maxResidual }
 }
