@@ -376,3 +376,60 @@ export interface ResearchResponse {
   costs: { components: CostComponent[]; round_trip_bps: number | null; unknown_components: string[] }
   pairs: PairResult[]
 }
+
+// --- Relative value (GET /api/relative-value) --------------------------------------------------
+
+export interface ContractQuote {
+  contract_id: string
+  symbol: string
+  expiry: string
+  close: string
+  quotation_base_g: string
+  price_basis_fineness: number
+  price_quote_location: string
+  inr_per_gram_999: string | null
+  spec_version_id: string | null
+  spec_verified: boolean
+  volume: number | null
+  traded_value_lakh: string | null
+  open_interest: number | null
+  days_to_expiry: number
+  thin: boolean
+  thin_reasons: string[]
+  error: string | null
+}
+
+export interface PairGap {
+  symbol_a: string
+  symbol_b: string
+  contract_a: string
+  contract_b: string
+  expiry_gap_days: number
+  gap_bps: number
+  resolution_bps: number
+  tradeable: boolean
+  not_tradeable_reasons: string[]
+  location_basis: string | null
+}
+
+export interface RelativeValueDay {
+  trade_date: string
+  contracts: ContractQuote[]
+  pairs: PairGap[]
+}
+
+export interface RelativeValueResponse {
+  kind: 'empty' | 'user_uploaded' | 'synthetic'
+  synthetic: boolean
+  basis: string
+  price_field: string
+  disclaimers: string[]
+  liquidity: {
+    min_volume_lots: number
+    min_traded_value_lakh: string
+    min_open_interest_lots: number
+    expiry_buffer_days: number
+    max_expiry_gap_days: number
+  }
+  days: RelativeValueDay[]
+}

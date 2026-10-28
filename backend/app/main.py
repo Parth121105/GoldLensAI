@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
 
 from app import __version__
-from app.api import datasets, health, instruments, observations, package, research
+from app.api import analysis, datasets, health, instruments, observations, package, research
 from app.frontend import mount_frontend
 from app.persistence import ImportArchive
 from app.settings import Settings
@@ -46,7 +46,7 @@ def create_app(
     app.state.store = SessionStore.open(ImportArchive(store_dir) if store_dir else None)
 
     # Every route lives under /api so the Vite dev proxy can forward it unchanged.
-    for module in (health, instruments, datasets, observations, research, package):
+    for module in (health, instruments, datasets, observations, research, package, analysis):
         app.include_router(module.router, prefix="/api")
 
     # Registered last so API routes always take precedence.

@@ -2,6 +2,7 @@ import type {
   DatasetStatus,
   InstrumentsResponse,
   ObservationsResponse,
+  RelativeValueResponse,
   Readiness,
   ResearchRequest,
   ResearchResponse,
@@ -74,6 +75,7 @@ export const api = {
   /** Latest research for the current data, or null if none has been run (200 with a null body). */
   latestResearch: () => request<ResearchResponse | null>('/api/research'),
   readiness: () => request<Readiness>('/api/readiness'),
+  relativeValue: () => request<RelativeValueResponse>('/api/relative-value'),
   runResearch: (body: ResearchRequest) =>
     request<ResearchResponse>('/api/research', {
       method: 'POST',
