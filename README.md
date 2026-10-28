@@ -1,5 +1,8 @@
 # Gold Lens
 
+**Live:** https://goldlensai.onrender.com (Render free plan: the first visit after a quiet spell
+can take about a minute while the server wakes up.)
+
 Relative-value research on MCX gold futures: GOLDM, GOLDTEN, GOLDGUINEA and GOLDPETAL.
 Research and decision support only. It does not trade and is not investment advice.
 
