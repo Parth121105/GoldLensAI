@@ -49,3 +49,6 @@ backend/data/raw/*
 
 # Parsed gold rows saved by the backend so imports survive a restart (exchange data stays out of Git)
 backend/data/store/
+
+# Local handover document (regenerated on request, not part of the repo)
+docs/GoldLensAI_Handover.pdf
