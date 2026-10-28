@@ -524,3 +524,45 @@ export interface LifecycleResponse {
   yearly_problem: string | null
   yearly: YearlyRow[]
 }
+
+// --- Synthetic validation (GET /api/validation/synthetic) ------------------------------------------
+
+export interface SyntheticRun {
+  label: string
+  injected: boolean
+  trade_dates: number
+  first_date: string
+  last_date: string
+  eligible_dates_needed: number
+  holdout_from: string | null
+  holdout_to: string | null
+  pairs: { symbol_pair: string; eligible_dates: number; verdict: string; z_threshold: number | null; baseline_window: number | null }[]
+  injections_total: number
+  injections_in_holdout: number
+  caught: number
+  catch_rate: number | null
+  clean_points: number
+  false_alarms: number
+  false_alarm_rate: number | null
+  round_trip_cost_bps: number
+  cost_labels: string[]
+  making_charges_paid: string
+  pnl: {
+    trades: number
+    total_gross_bps: number | null
+    total_net_bps: number | null
+    mean_gross_bps: number | null
+    mean_net_bps: number | null
+    hit_rate_net: number | null
+    total_gold_move_bps: number | null
+    corr_strategy_gold: number | null
+  }
+  cumulative: { exit: string; cumulative_gross_bps: number; cumulative_net_bps: number; cumulative_gold_move_bps: number }[]
+}
+
+export interface SyntheticValidationResponse {
+  synthetic: true
+  notice: string
+  model: string[]
+  runs: SyntheticRun[]
+}

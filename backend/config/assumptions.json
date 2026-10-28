@@ -1,5 +1,5 @@
 {
-  "_about": "Editable assumptions used by Gold Lens. These are choices, not exchange rules or facts. Change a value and restart the server.",
+  "_about": "Editable assumptions used by Gold Lens. These are choices, not exchange rules or facts. Costs are rough planning figures, not a broker quote. Change a value and restart the server.",
   "liquidity": {
     "min_traded_value_lakh": {
       "value": "100",
@@ -29,6 +29,43 @@
       "value": 10,
       "unit": "calendar days between the two expiries",
       "why": "GOLDM expires on the 5th and the others at month-end, so a few days' difference has to be allowed to pair them at all."
+    }
+  },
+  "costs": {
+    "brokerage": {
+      "value": 0.5,
+      "unit": "bps of notional per leg-side",
+      "why": "Assumed discount-broker flat fee spread over a typical order. Per-order fees weigh far more on small lots (GOLDPETAL is 1 g) than on GOLDM (100 g)."
+    },
+    "exchange_transaction_charges": {
+      "value": 0.3,
+      "unit": "bps of notional per leg-side",
+      "why": "Assumed MCX transaction charge plus 18% GST on it, rounded up."
+    },
+    "statutory_taxes_and_levies": {
+      "value": 0.6,
+      "unit": "bps of notional per leg-side",
+      "why": "Assumed average of commodities transaction tax (sell side), stamp duty (buy side) and SEBI fee, spread over both sides."
+    },
+    "slippage": {
+      "value": 1.0,
+      "unit": "bps of notional per leg-side",
+      "why": "Assumed cost of crossing the spread. Settlement and close prices are not fill prices; real slippage on thin contracts can be much larger."
+    },
+    "making_charge_goldten_inr_per_10g": {
+      "value": 300,
+      "unit": "INR per 10 g, paid by the buyer only on delivery",
+      "why": "From the GOLDTEN specification PDFs. Gold Lens closes positions before the tender period, so this is zero unless a position reaches delivery."
+    },
+    "making_charge_goldguinea_inr_per_8g": {
+      "value": 200,
+      "unit": "INR per 8 g guinea, paid by the buyer only on delivery",
+      "why": "From the GOLDGUINEA specification PDFs. Zero unless a position reaches delivery."
+    },
+    "making_charge_goldpetal_inr_per_1g": {
+      "value": 100,
+      "unit": "INR per 1 g coin, paid by the buyer only on delivery",
+      "why": "From the GOLDPETAL specification PDFs. Zero unless a position reaches delivery."
     }
   }
 }

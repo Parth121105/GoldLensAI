@@ -4,6 +4,7 @@ import type {
   ObservationsResponse,
   LifecycleResponse,
   RelativeValueResponse,
+  SyntheticValidationResponse,
   TermStructureResponse,
   Readiness,
   ResearchRequest,
@@ -80,6 +81,7 @@ export const api = {
   relativeValue: () => request<RelativeValueResponse>('/api/relative-value'),
   termStructure: () => request<TermStructureResponse>('/api/term-structure'),
   lifecycle: () => request<LifecycleResponse>('/api/lifecycle'),
+  syntheticValidation: () => request<SyntheticValidationResponse>('/api/validation/synthetic'),
   runResearch: (body: ResearchRequest) =>
     request<ResearchResponse>('/api/research', {
       method: 'POST',

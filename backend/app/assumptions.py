@@ -54,6 +54,22 @@ class Assumptions:
         return int(self.get("pairing.max_expiry_gap_days"))
 
 
+COST_COMPONENTS = ("brokerage", "exchange_transaction_charges", "statutory_taxes_and_levies", "slippage")
+
+
+def cost_model(a: Assumptions | None = None):
+    """The four per-leg-side cost components from the assumptions file, each labelled as an assumption."""
+    from app.research.costs import CostModel
+
+    a = a or default_assumptions()
+    model = CostModel()
+    for name in COST_COMPONENTS:
+        model = model.with_component(
+            name, float(a.get(f"costs.{name}")), source=f"assumption, {a.path.name}"
+        )
+    return model
+
+
 def load_assumptions(path: Path) -> Assumptions:
     raw = json.loads(path.read_text(encoding="utf-8"))
     entries = {}

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from app.assumptions import default_assumptions
 from app.normalization import PriceField
 from app.research.costs import CostModel
 
@@ -19,15 +20,17 @@ class ResearchConfig:
 
     # Contracts are paired only if their expiries are at most this far apart.
     # GOLDM expires on the 5th, the others at month-end, so 0 would exclude GOLDM.
-    max_expiry_gap_days: int = 10
+    # Default read from backend/config/assumptions.json (pairing.max_expiry_gap_days).
+    max_expiry_gap_days: int = field(default_factory=lambda: default_assumptions().max_expiry_gap_days)
 
     # Both legs must report at least this volume (file units) on the date.
     # Volume is a liquidity proxy only; it says nothing about order-book depth.
     min_volume: int = 1
 
     # Exclude dates this close to the nearer expiry (staggered delivery tender
-    # period is the last 3-5 trading days per MCX circulars).
-    lifecycle_buffer_days: int = 7
+    # period is the last 3-5 trading days per MCX circulars). Default read from
+    # backend/config/assumptions.json (lifecycle.expiry_buffer_days).
+    lifecycle_buffer_days: int = field(default_factory=lambda: default_assumptions().expiry_buffer_days)
 
     allow_unverified_specs: bool = False
 

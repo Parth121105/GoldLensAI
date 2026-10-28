@@ -5,6 +5,7 @@ import { COST_COMPONENTS } from '../api/types'
 import type { CostInput, CostName, Finding, OutcomeStats, PairResult, Readiness, ResearchResponse, Series } from '../api/types'
 import { Figure } from '../components/Bento'
 import { RelativeValueSection } from '../components/analysis/RelativeValue'
+import { SyntheticValidationSection } from '../components/analysis/SyntheticValidation'
 import { TermStructureSection } from '../components/analysis/TermStructure'
 import { ReadinessPanel } from '../components/Readiness'
 import { SpreadChart } from '../components/ui/ink/SpreadChart'
@@ -50,6 +51,7 @@ export function Research() {
         {hasData && <ReadinessMeter readiness={readiness.data} error={readiness.error} />}
         {hasData && <RelativeValueSection />}
         {hasData && <TermStructureSection />}
+        <SyntheticValidationSection />
 
         {unavailable ? (
           <DiagramCard className="lg:col-span-12" title="Run research" description="Research runs on the observations held in this session.">
