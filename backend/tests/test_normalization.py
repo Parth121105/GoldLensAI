@@ -42,7 +42,16 @@ def test_hand_worked_examples(symbol, price, expiry, per_gram_basis, per_gram_99
     assert result.inr_per_gram_at_basis == Decimal(per_gram_basis)
     assert result.inr_per_gram_999.quantize(SIX_DP) == Decimal(per_gram_999).quantize(SIX_DP)
     assert result.spec_status is SpecStatus.VERIFIED
-    assert result.spec_version_id == f"{symbol}@MCX/TRD/456/2025"
+    assert result.spec_version_id == VERSION_FOR_THESE_EXPIRIES[symbol]
+
+
+# The specification PDFs that cover the expiries above (backend/data/raw/specs/).
+VERSION_FOR_THESE_EXPIRIES = {
+    "GOLDM": "GOLDM@MCX/TRD/456/2025",
+    "GOLDTEN": "GOLDTEN@MCX/TRD/134/2025",
+    "GOLDGUINEA": "GOLDGUINEA@MCX/TRD/650/2024",
+    "GOLDPETAL": "GOLDPETAL@MCX/TRD/858/2024",
+}
 
 
 def test_equal_fine_gold_value_normalizes_to_equal_prices():
@@ -143,11 +152,11 @@ def test_unknown_instrument_is_rejected():
 
 def test_unverified_specification_is_refused_by_default():
     with pytest.raises(UnverifiedSpecificationError, match="GOLDTEN"):
-        normalize(quote("GOLDTEN", "72450", date(2025, 4, 30)))
+        normalize(quote("GOLDTEN", "72450", date(2027, 7, 30)))
 
 
 def test_unverified_specification_can_be_assumed_explicitly_and_is_flagged():
-    result = normalize(quote("GOLDTEN", "72450", date(2025, 4, 30)), allow_unverified=True)
+    result = normalize(quote("GOLDTEN", "72450", date(2027, 7, 30)), allow_unverified=True)
 
     assert result.spec_status is SpecStatus.UNVERIFIED
     assert any(w.startswith("UNVERIFIED SPECIFICATION ASSUMED") for w in result.warnings)
@@ -156,7 +165,7 @@ def test_unverified_specification_can_be_assumed_explicitly_and_is_flagged():
 def test_symbol_is_canonicalised_before_lookup():
     result = normalize(quote("  goldpetal ", "7245"))
 
-    assert result.spec_version_id == "GOLDPETAL@MCX/TRD/456/2025"
+    assert result.spec_version_id == "GOLDPETAL@MCX/TRD/858/2024"
 
 
 def test_settlement_price_is_flagged_as_not_executable():

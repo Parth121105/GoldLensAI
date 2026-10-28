@@ -46,7 +46,8 @@ def test_instruments_come_from_the_specification_registry(client):
     goldm = body["instruments"][0]["versions"][0]
     assert (goldm["quotation_base_g"], goldm["price_basis_fineness"]) == ("10", 995)
     assert goldm["expiry_from"] == "2025-09" and goldm["verification"] == "verified"
-    assert goldm["sources"][0]["id"] == "MCX/TRD/456/2025"
+    assert goldm["sources"][0]["id"] == "gold-mini-november-2025-contract-onwards"
+    assert goldm["tender_period_trading_days"] == 3 and goldm["launch_calendar"]
     assert body["instruments"][1]["first_trading_date"] == "2025-04-01"
 
 
@@ -231,8 +232,9 @@ def test_observations_carry_raw_and_backend_normalized_prices(client):
 
 
 def test_observation_with_unverified_specification_is_not_normalized(client):
-    row = "02-Jun-2025,FUTCOM,GOLDPETAL,30-Jun-2025,XX,0,7200,7210,7190,7205,7200,10,0.7,5\n"
-    upload(client, (HEADER + row).encode(), "june.csv")
+    # No specification PDF covers GOLDPETAL expiring before April 2025.
+    row = "03-Mar-2025,FUTCOM,GOLDPETAL,31-Mar-2025,XX,0,7200,7210,7190,7205,7200,10,0.7,5\n"
+    upload(client, (HEADER + row).encode(), "march.csv")
     (obs,) = client.get("/api/observations").json()["observations"]
 
     assert obs["normalized"] is None

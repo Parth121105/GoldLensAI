@@ -134,8 +134,8 @@ def test_dates_near_expiry_are_ineligible():
 
 
 def test_unverified_specification_is_ineligible_unless_allowed():
-    expiry = month_end(2025, 6)  # before the verified window
-    d = date(2025, 6, 2)
+    expiry = month_end(2027, 7)  # after the verified window
+    d = date(2027, 7, 1)
     obs = [observation("GOLDTEN", expiry, d, Decimal("72450")),
            observation("GOLDPETAL", expiry, d, Decimal("7245"))]
 

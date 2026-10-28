@@ -65,6 +65,26 @@ class LastTradingDayRule:
 
 
 @dataclass(frozen=True, slots=True)
+class TenderPeriod:
+    trading_days: int  # staggered delivery tender period, including expiry day
+    incremental_margin_pct: Decimal
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
+class MakingCharge:
+    inr: Decimal
+    per: str
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
+class LaunchMonth:
+    launch: tuple[int, int]
+    expiry: tuple[int, int]
+
+
+@dataclass(frozen=True, slots=True)
 class ContractSpec:
     version_id: str
     symbol: str
@@ -85,6 +105,11 @@ class ContractSpec:
     last_trading_day_text: str
     sources: tuple[SourceCitation, ...]
     notes: tuple[str, ...]
+    contract_start_text: str = ""
+    tender_period: TenderPeriod | None = None
+    delivery_settlement: str = ""
+    making_charge: MakingCharge | None = None
+    launch_calendar: tuple[LaunchMonth, ...] = ()
 
     def covers_expiry(self, expiry: date) -> bool:
         return self.expiry_from <= (expiry.year, expiry.month) <= self.expiry_to
@@ -123,10 +148,13 @@ class SpecRegistry:
         specs: list[ContractSpec],
         sources: dict[str, Source],
         listings: dict[str, InstrumentListing],
+        uncovered: dict[str, str] | None = None,
     ):
         self._specs = specs
         self.sources = sources
         self.listings = listings
+        # Expiry ranges no source covers, per symbol, stated in plain words.
+        self.uncovered = uncovered or {}
 
     @classmethod
     def from_file(cls, path: Path) -> SpecRegistry:
@@ -152,7 +180,7 @@ class SpecRegistry:
             )
             for symbol, item in raw.get("instrument_listing", {}).items()
         }
-        return cls(specs, sources, listings)
+        return cls(specs, sources, listings, raw.get("uncovered_expiries", {}))
 
     @property
     def symbols(self) -> frozenset[str]:
@@ -226,7 +254,27 @@ def _parse_spec(s: dict, sources: dict[str, Source]) -> ContractSpec:
         last_trading_day_text=s["last_trading_day_text"],
         sources=tuple(citations),
         notes=tuple(s.get("notes", [])),
+        contract_start_text=s.get("contract_start_text", ""),
+        tender_period=_tender(s.get("tender_period")),
+        delivery_settlement=s.get("delivery_settlement", ""),
+        making_charge=_making(s.get("making_charge")),
+        launch_calendar=tuple(
+            LaunchMonth(_parse_month(m["launch"]), _parse_month(m["expiry"]))
+            for m in s.get("launch_calendar", [])
+        ),
     )
+
+
+def _tender(t: dict | None) -> TenderPeriod | None:
+    if not t:
+        return None
+    return TenderPeriod(int(t["trading_days"]), Decimal(t["incremental_margin_pct"]), t["text"])
+
+
+def _making(m: dict | None) -> MakingCharge | None:
+    if not m:
+        return None
+    return MakingCharge(Decimal(m["inr"]), m["per"], m["text"])
 
 
 def _parse_month(value: str) -> tuple[int, int]:

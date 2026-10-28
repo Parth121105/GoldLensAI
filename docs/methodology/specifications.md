@@ -2,21 +2,47 @@
 
 The machine-readable registry is
 [`backend/app/specs/mcx_gold_specs.json`](../../backend/app/specs/mcx_gold_specs.json).
-This page explains where each value comes from and what is still uncertain.
+Every version in it was transcribed from an official MCX contract specification
+PDF kept in `backend/data/raw/specs/` (git-ignored, like all exchange data).
+`python -m app.cli specs` prints the registry.
 
-## Sources
+## Sources and coverage
 
-| ID | Issued | What it contains | Copy obtained from |
-|---|---|---|---|
-| MCX/TRD/456/2025 | 2025-09-11 | Full contract specifications of GOLDM, GOLDTEN, GOLDGUINEA, GOLDPETAL (Annexures 2–5) and launch calendars | [broker mirror (PDF)](https://www.steelcitynettrade.com/Circulars/Modification%20in%20Launch%20Calendar%20of%20Gold%20Mini,%20Gold%20Ten,%20Gold%20Guinea.pdf) |
-| MCX/MCXCCL/148/2025 | 2025-03-25 | GOLDTEN delivery and settlement procedure, including "The price of 10 Gram Gold is on the basis of 999 purity" | [broker mirror (PDF)](https://www.steelcitynettrade.com/Circulars/Delivery%20&%20Settlement%20Procedure%20for%20GOLD%20TEN%20Contract%201.pdf) |
+A PDF titled "X contract onwards" governs contracts expiring from month X until
+the month before the next PDF for the same contract takes over, and never past
+the last expiry in its own launch calendar.
 
-`mcxindia.com` returned HTTP 403 to automated requests on 2026-10-25, so both
-circulars were read from a broker's mirror. The PDF metadata names MCX as the
-author. Check them against the copies on mcxindia.com when you can open the
-site in a browser.
+| Contract | PDF (contract onwards) | Reference circulars | Expiries covered | Tender period | Making charge on delivery |
+|---|---|---|---|---|---|
+| GOLD | February 2026 | MCX/TRD/086/2025 (2025-02-14) | 2026-02 – 2026-06 | last 5 trading days, 5% | – |
+| GOLD | August 2026 | MCX/TRD/383/2025 (2025-08-04) | 2026-08 – 2026-12 | last 3 trading days, 8.34% | – |
+| GOLD | February 2027 | MCX/TRD/040/2026 (2026-01-27), MCX/PMT/375/2026 (2026-07-01) | 2027-02 – 2027-12 | last 3, 8.34% | – |
+| GOLDM | November 2025 | MCX/TRD/456/2025 (2025-09-11) | 2025-09 – 2026-04 ¹ | last 3, 8.34% | – |
+| GOLDM | May 2026 | MCX/TRD/041/2026, MCX/PMT/178/2026 (2026-04-06) | 2026-05 – 2026-07 | last 3, 8.34% | – |
+| GOLDM | August 2026 | + MCX/PMT/375/2026 | 2026-08 – 2027-07 | last 3, 8.34% | – |
+| GOLDTEN | April 2025 | MCX/TRD/134/2025 (2025-03-18), MCXCCL/C&S/058/2025 | 2025-04 – 2025-10 | last 5, 5% | ₹300 per 10 g |
+| GOLDTEN | November 2025 | MCX/TRD/456/2025 | 2025-11 – 2026-06 | last 3, 8.34% | ₹300 per 10 g |
+| GOLDTEN | July 2026 | MCX/TRD/044/2026, MCX/PMT/375/2026 | 2026-07 – 2027-06 | last 3, 8.34% | ₹300 per 10 g |
+| GOLDGUINEA | January 2025 | MCX/TRD/650/2024 (2024-09-30) | 2025-01 – 2025-11 | last 5, 5% | ₹200 per guinea |
+| GOLDGUINEA | December 2025 | MCX/TRD/456/2025 | 2025-12 – 2026-06 | last 3, 8.34% | ₹200 per guinea |
+| GOLDGUINEA | July 2026 | MCX/TRD/042/2026, MCX/PMT/375/2026 | 2026-07 – 2027-06 | last 3, 8.34% | ₹200 per guinea |
+| GOLDPETAL | April 2025 | MCX/TRD/858/2024 (2024-12-31) | 2025-04 – 2025-11 | last 5, 5% | ₹100 per 1 g coin |
+| GOLDPETAL | December 2025 | MCX/TRD/456/2025 | 2025-12 – 2026-06 | last 3, 8.34% | ₹100 per 1 g coin |
+| GOLDPETAL | July 2026 | MCX/TRD/043/2026, MCX/PMT/375/2026 | 2026-07 – 2027-06 | last 3, 8.34% | ₹100 per 1 g coin |
 
-## Verified values
+¹ The November 2025 GOLDM PDF's launch calendar also lists the September and
+October 2025 expiries. No other PDF covers them, so they are included.
+
+**Not covered by any PDF:** GOLD before 2026-02 and after 2027-12; GOLDM before
+2025-09 and after 2027-07; GOLDTEN after 2027-06 (first listed April 2025);
+GOLDGUINEA before 2025-01 and after 2027-06; GOLDPETAL before 2025-04 and after
+2027-06. Lookups for those expiries return `UNVERIFIED`, and normalization
+refuses them unless `allow_unverified=True` is passed explicitly.
+
+GOLD (1 kg) is recorded for reference only; Gold Lens compares GOLDM, GOLDTEN,
+GOLDGUINEA and GOLDPETAL.
+
+## Values that do not change between versions
 
 | | GOLDM | GOLDTEN | GOLDGUINEA | GOLDPETAL |
 |---|---|---|---|---|
@@ -25,53 +51,32 @@ site in a browser.
 | Price basis fineness | 995 | 999 | 999 | 999 |
 | Tick size | ₹1 per 10 g | ₹1 per 10 g | ₹1 per 8 g | ₹1 per 1 g |
 | Price quote | Ex-Ahmedabad | Ex-Ahmedabad | Ex-Ahmedabad | **Ex-Mumbai** |
+| Contract start day | 6th of launch month | 1st of launch month | 1st of launch month | 1st of launch month |
 | Last trading day | 5th of expiry month | last calendar day | last calendar day | last calendar day |
-| Delivery logic | Compulsory | Compulsory | Compulsory | Compulsory |
-| Verified for expiries | Sep 2025 – Jul 2026 | Aug 2025 – Jun 2026 | Aug 2025 – Jun 2026 | Aug 2025 – Jun 2026 |
 
-All four quotes exclude GST and include import duty and customs.
-If the last trading day is a holiday, it moves to the preceding working day.
+All quotes exclude GST and include import duty and customs. A start day that is
+a holiday moves to the following working day; a last trading day that is a
+holiday moves to the preceding working day.
 
 ### How the price basis fineness was established
 
-The circulars state a *quality specification*, which is a delivery
-requirement, not a statement about what the quoted price refers to. The price
-basis was taken from these passages:
+The PDFs state a *quality specification*, which is a delivery requirement.
+The price basis comes from these passages:
 
 - **GOLDM (995).** The quality specification is 995, and a seller delivering
   999 purity receives "Rate of delivery * 999/995". That premium only makes
   sense if the quoted rate is for 995.
-- **GOLDTEN (999).** MCXCCL/148/2025 says so directly. The Due Date Rate is
-  Ahmedabad 995 spot × 999/995.
-- **GOLDGUINEA, GOLDPETAL (999).** The quality specification is 999, and the
-  Due Date Rate is the 995 spot converted with × 999/995 and then scaled by 8/10
-  or 1/10.
+- **GOLDTEN (999).** "The price of 10 Gram Gold is on the basis of 999 purity."
+  The Due Date Rate is Ahmedabad 995 spot × 999/995.
+- **GOLDGUINEA, GOLDPETAL (999).** "The price of Gold Guinea / 1 Gram Gold Coin
+  is on the basis of 999 purity." The Due Date Rate is the 995 spot × 999/995,
+  scaled by 8/10 or 1/10.
 
-## Verification windows
+## Notes
 
-Each specification version is marked verified only for the expiry months in
-its circular's launch calendar. For any other contract, lookup returns
-`UNVERIFIED`. Normalization then refuses the contract unless the caller passes
-`allow_unverified=True`, and every such result carries an
-`UNVERIFIED SPECIFICATION ASSUMED` warning.
-
-## Unresolved
-
-1. **Contracts expiring after Jun/Jul 2026.** No later full specification was
-   read. MCX circular 552/2026 (September 2026) mentions GOLDPETAL and GOLDTEN
-   October 2026 expiries, but mcxindia.com blocked the download.
-2. **Contracts before Aug/Sep 2025.** TRD/456/2025 changed only the launch
-   calendar. Earlier specifications were probably the same apart from the
-   calendar, but this has not been confirmed from a primary document.
-   Secondary sources describe an older 995-purity Gold Guinea and a Gold Petal
-   that was not 1 g deliverable before 2019.
-3. **GOLDTEN listing.** Trading began on 2025-04-01 according to MCXCCL/148/2025
-   (contracts expiring April 2025 onward) and consistent secondary reports. The
-   launch circular MCX/TRD/134/2025 was not read.
-4. **GOLDTEN tender period.** The tender period is the last 5 trading days in
-   MCXCCL/148/2025 (March 2025) but the last 3 in TRD/456/2025 (September 2025).
-   It doesn't affect normalization, but it matters for lifecycle analysis in
-   Phase 4.
-5. **Good Delivery changes, July 2026.** MCX/PMT/375/2026 expanded the refiners
-   accepted for delivery, effective 2026-07-13 (secondary reports). It isn't
-   known to change the price basis or units.
+- GOLDPETAL is priced Ex-Mumbai; the others Ex-Ahmedabad. Normalization does not
+  adjust for location; the difference is reported as a known basis.
+- The July 2026 GOLDPETAL spec sheet says buyer funds pay-in is T+2, while its
+  delivery procedure says E+1. The procedure value is recorded.
+- Making charges are paid by the buyer on delivery. They affect the cost of a
+  position held into delivery, not the quoted price.

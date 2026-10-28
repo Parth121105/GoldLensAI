@@ -79,9 +79,15 @@ def _print_specs() -> int:
         print(f"  trading unit  {spec.trading_unit_g} g, quoted per {spec.quotation_base_g} g")
         print(f"  price basis   {spec.price_basis_fineness} fineness, {spec.price_quote_location}")
         print(f"  last trading  {spec.last_trading_day_text}")
+        if spec.tender_period:
+            print(f"  tender period {spec.tender_period.text}")
+        if spec.making_charge:
+            print(f"  making charge {spec.making_charge.text}")
         for c in spec.sources:
             print(f"  source        {c.source.id} ({c.source.issued_on}), {c.location}")
         print()
+    for symbol, gap in sorted(registry.uncovered.items()):
+        print(f"No specification PDF covers {symbol} expiries {gap}.")
     return 0
 
 

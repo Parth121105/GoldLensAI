@@ -2,7 +2,13 @@
 
 from fastapi import APIRouter
 
-from app.api.schemas import InstrumentOut, InstrumentsResponse, SourceCitationOut, SpecVersionOut
+from app.api.schemas import (
+    InstrumentOut,
+    InstrumentsResponse,
+    LaunchMonthOut,
+    SourceCitationOut,
+    SpecVersionOut,
+)
 from app.normalization import COMPARISON_BASIS, METHOD_VERSION
 from app.research.pairs import SYMBOL_ORDER
 from app.specs import ContractSpec, default_registry
@@ -37,8 +43,8 @@ def _version(spec: ContractSpec) -> SpecVersionOut:
     return SpecVersionOut(
         version_id=spec.version_id,
         verification=spec.verification.value,
-        expiry_from=f"{spec.expiry_from[0]:04d}-{spec.expiry_from[1]:02d}",
-        expiry_to=f"{spec.expiry_to[0]:04d}-{spec.expiry_to[1]:02d}",
+        expiry_from=_ym(spec.expiry_from),
+        expiry_to=_ym(spec.expiry_to),
         trading_unit_g=str(spec.trading_unit_g),
         quotation_base_g=str(spec.quotation_base_g),
         price_basis_fineness=spec.price_basis_fineness,
@@ -49,6 +55,14 @@ def _version(spec: ContractSpec) -> SpecVersionOut:
         quality_text=spec.quality_text,
         price_basis_evidence=spec.price_basis_evidence,
         last_trading_day_text=spec.last_trading_day_text,
+        contract_start_text=spec.contract_start_text,
+        tender_period_trading_days=spec.tender_period.trading_days if spec.tender_period else None,
+        tender_period_text=spec.tender_period.text if spec.tender_period else "",
+        delivery_settlement=spec.delivery_settlement,
+        making_charge_text=spec.making_charge.text if spec.making_charge else None,
+        launch_calendar=[
+            LaunchMonthOut(launch=_ym(m.launch), expiry=_ym(m.expiry)) for m in spec.launch_calendar
+        ],
         sources=[
             SourceCitationOut(
                 id=c.source.id,
@@ -64,3 +78,7 @@ def _version(spec: ContractSpec) -> SpecVersionOut:
         ],
         notes=list(spec.notes),
     )
+
+
+def _ym(ym: tuple[int, int]) -> str:
+    return f"{ym[0]:04d}-{ym[1]:02d}"

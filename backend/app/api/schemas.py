@@ -25,6 +25,11 @@ class SourceCitationOut(BaseModel):
     retrieval_notes: str
 
 
+class LaunchMonthOut(BaseModel):
+    launch: str = Field(description="Launch month, YYYY-MM")
+    expiry: str = Field(description="Expiry month, YYYY-MM")
+
+
 class SpecVersionOut(BaseModel):
     version_id: str
     verification: str
@@ -40,6 +45,12 @@ class SpecVersionOut(BaseModel):
     quality_text: str
     price_basis_evidence: str
     last_trading_day_text: str
+    contract_start_text: str = ""
+    tender_period_trading_days: int | None = None
+    tender_period_text: str = ""
+    delivery_settlement: str = ""
+    making_charge_text: str | None = None
+    launch_calendar: list[LaunchMonthOut] = []
     sources: list[SourceCitationOut]
     notes: list[str]
 

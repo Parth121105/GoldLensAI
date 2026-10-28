@@ -134,7 +134,7 @@ def test_derived_column_disagreement_is_a_warning_not_a_silent_fix():
 
 
 def test_unit_mismatch_outside_the_verified_window_is_only_a_warning():
-    row = "2026-10-23,GOLDM,2026-11-05,13,8,140802.0,141500.0,139772.0,140453.0,141802.0,-0.951,175566.25,39364,3936.4,553872.9,42924,0\n"
+    row = "2026-10-23,GOLDM,2027-08-05,13,8,140802.0,141500.0,139772.0,140453.0,141802.0,-0.951,175566.25,39364,3936.4,553872.9,42924,0\n"
     result = table(B1_HEADER + row)
 
     assert result.accepted == 1
@@ -381,13 +381,13 @@ def test_split_plan_matches_the_windows_validation_actually_uses():
 def test_unverified_expiry_range_is_by_date_not_by_symbol():
     """Regression: the range was taken from a list sorted by symbol, so it could miss the latest expiry."""
     rows = (
-        "2026-10-23,GOLDM,2027-04-05,164,10,148382.0,148466.0,147093.0,147499.0,149038.0,-1.033,147499.0,142,14.2,2099.41,108,0\n"
-        "2026-10-23,GOLDTEN,2026-10-30,7,10,141444.0,141872.0,140130.0,140832.0,142223.0,-0.978,140832.0,16895,168.95,23829.92,22198,0\n"
+        "2026-10-23,GOLDM,2027-08-05,164,10,148382.0,148466.0,147093.0,147499.0,149038.0,-1.033,147499.0,142,14.2,2099.41,108,0\n"
+        "2026-10-23,GOLDTEN,2027-07-30,7,10,141444.0,141872.0,140130.0,140832.0,142223.0,-0.978,140832.0,16895,168.95,23829.92,22198,0\n"
     )
     result = import_bhavcopy_bytes((B1_HEADER + rows).encode(), source_name="SYNTHETIC_b1.csv", today=TODAY)
     check = next(c for c in assess([result]).checks if c.id == "verified_specifications")
 
-    assert "2026-10-30 to 2027-04-05" in check.detail
+    assert "2027-07-30 to 2027-08-05" in check.detail
 
 
 # --- Real package (only if extracted locally) -----------------------------------------------------

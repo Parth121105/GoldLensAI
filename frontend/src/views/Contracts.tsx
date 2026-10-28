@@ -238,7 +238,7 @@ function SpecDetails({ instruments, contracts }: { instruments: Instrument[]; co
             <ul className="space-y-0.5 border-t border-rule pt-2 text-xs">
               {v.sources.map((s) => (
                 <li key={s.id}>
-                  <a href={s.retrieved_from} target="_blank" rel="noreferrer" className="font-medium text-ink underline underline-offset-2">{s.id}</a>{' '}
+                  <span className="font-medium text-ink" title={s.retrieved_from}>{s.id}</span>{' '}
                   · {s.location}
                 </li>
               ))}
