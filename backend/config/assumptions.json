@@ -1,0 +1,34 @@
+{
+  "_about": "Editable assumptions used by Gold Lens. These are choices, not exchange rules or facts. Change a value and restart the server.",
+  "liquidity": {
+    "min_traded_value_lakh": {
+      "value": "100",
+      "unit": "INR lakh traded on the day (100 lakh = Rs 1 crore)",
+      "why": "Below this a contract is treated as thin and is never shown as tradeable. Traded value is used because lot sizes differ (1 g to 100 g)."
+    },
+    "min_volume_lots": {
+      "value": 1,
+      "unit": "lots traded on the day",
+      "why": "A contract with no trades has only a nominal closing price."
+    },
+    "min_open_interest_lots": {
+      "value": 1,
+      "unit": "lots of open interest",
+      "why": "No open interest means no one holds the contract."
+    }
+  },
+  "lifecycle": {
+    "expiry_buffer_days": {
+      "value": 7,
+      "unit": "calendar days before expiry",
+      "why": "Contracts this close to expiry are excluded. The official MCX tender period is the last 3 trading days (current specifications); the 7 calendar days add a margin for delivery-driven trading before it starts."
+    }
+  },
+  "pairing": {
+    "max_expiry_gap_days": {
+      "value": 10,
+      "unit": "calendar days between the two expiries",
+      "why": "GOLDM expires on the 5th and the others at month-end, so a few days' difference has to be allowed to pair them at all."
+    }
+  }
+}

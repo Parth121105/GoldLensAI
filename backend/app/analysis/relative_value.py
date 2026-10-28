@@ -16,11 +16,12 @@ from __future__ import annotations
 
 import math
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from decimal import Decimal
 from itertools import combinations
 
+from app.assumptions import Assumptions, default_assumptions
 from app.ingestion.models import Observation
 from app.normalization import NormalizationError, PriceField, RawQuote, normalize
 from app.research.pairs import BPS, SYMBOL_ORDER
@@ -44,6 +45,10 @@ class LiquidityFilter:
     min_volume_lots: int = 1
     min_traded_value_lakh: Decimal = Decimal("100")  # INR 1 crore
     min_open_interest_lots: int = 1
+
+    @classmethod
+    def from_assumptions(cls, a: Assumptions) -> LiquidityFilter:
+        return cls(a.min_volume_lots, a.min_traded_value_lakh, a.min_open_interest_lots)
 
     def reasons(self, o: Observation) -> list[str]:
         out = []
@@ -94,6 +99,10 @@ class PairGap:
     tradeable: bool
     not_tradeable_reasons: tuple[str, ...]
     location_basis: str | None
+    # Only for pairs whose expiries differ: the part of the gap explained by the curves' carry
+    # slope over the expiry difference, and the gap with that part removed.
+    carry_bps: float | None = None
+    carry_adjusted_gap_bps: float | None = None
 
 
 @dataclass(slots=True)
@@ -106,13 +115,19 @@ class DaySnapshot:
 def relative_value(
     observations: list[Observation],
     *,
-    max_expiry_gap_days: int = 10,
-    expiry_buffer_days: int = 7,
+    max_expiry_gap_days: int | None = None,
+    expiry_buffer_days: int | None = None,
     liquidity: LiquidityFilter | None = None,
     registry: SpecRegistry | None = None,
+    assumptions: Assumptions | None = None,
 ) -> list[DaySnapshot]:
+    from app.analysis.term_structure import carry_adjusted_gap_bps, fit_curve
+
+    assumptions = assumptions or default_assumptions()
     registry = registry or default_registry()
-    liquidity = liquidity or LiquidityFilter()
+    liquidity = liquidity or LiquidityFilter.from_assumptions(assumptions)
+    max_expiry_gap_days = assumptions.max_expiry_gap_days if max_expiry_gap_days is None else max_expiry_gap_days
+    expiry_buffer_days = assumptions.expiry_buffer_days if expiry_buffer_days is None else expiry_buffer_days
     by_day: dict[date, list[Observation]] = defaultdict(list)
     for o in observations:
         if o.symbol in SYMBOL_ORDER:
@@ -123,6 +138,15 @@ def relative_value(
         rows = sorted(by_day[trade_date], key=lambda o: (SYMBOL_ORDER.index(o.symbol), o.expiry))
         snap = DaySnapshot(trade_date, [_quote(o, liquidity, registry) for o in rows])
         snap.pairs = _pairs(snap.contracts, max_expiry_gap_days, expiry_buffer_days)
+        curves = {s: fit_curve(s, trade_date, [q for q in snap.contracts if q.symbol == s]) for s in SYMBOL_ORDER}
+        quotes = {q.contract_id: q for q in snap.contracts}
+        for i, p in enumerate(snap.pairs):
+            ca, cb = curves.get(p.symbol_a), curves.get(p.symbol_b)
+            if p.expiry_gap_days == 0 or not (ca and cb):
+                continue
+            ta, tb = quotes[p.contract_a].days_to_expiry, quotes[p.contract_b].days_to_expiry
+            adjusted = carry_adjusted_gap_bps(p.gap_bps, ta, tb, ca.slope_per_day, cb.slope_per_day)
+            snap.pairs[i] = replace(p, carry_bps=p.gap_bps - adjusted, carry_adjusted_gap_bps=adjusted)
         days.append(snap)
     return days
 

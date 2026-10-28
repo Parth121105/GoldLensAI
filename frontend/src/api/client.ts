@@ -3,6 +3,7 @@ import type {
   InstrumentsResponse,
   ObservationsResponse,
   RelativeValueResponse,
+  TermStructureResponse,
   Readiness,
   ResearchRequest,
   ResearchResponse,
@@ -76,6 +77,7 @@ export const api = {
   latestResearch: () => request<ResearchResponse | null>('/api/research'),
   readiness: () => request<Readiness>('/api/readiness'),
   relativeValue: () => request<RelativeValueResponse>('/api/relative-value'),
+  termStructure: () => request<TermStructureResponse>('/api/term-structure'),
   runResearch: (body: ResearchRequest) =>
     request<ResearchResponse>('/api/research', {
       method: 'POST',

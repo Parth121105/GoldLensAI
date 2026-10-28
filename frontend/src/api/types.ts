@@ -410,6 +410,8 @@ export interface PairGap {
   tradeable: boolean
   not_tradeable_reasons: string[]
   location_basis: string | null
+  carry_bps: number | null
+  carry_adjusted_gap_bps: number | null
 }
 
 export interface RelativeValueDay {
@@ -430,6 +432,49 @@ export interface RelativeValueResponse {
     min_open_interest_lots: number
     expiry_buffer_days: number
     max_expiry_gap_days: number
+    official_tender_period: string
+    assumptions_file: string
+    assumptions: { key: string; value: string; unit: string; why: string }[]
   }
   days: RelativeValueDay[]
+}
+
+// --- Term structure (GET /api/term-structure) ----------------------------------------------------
+
+export interface CurvePoint {
+  contract_id: string
+  expiry: string
+  days_to_expiry: number
+  inr_per_gram_999: number
+  fitted: number
+  residual_bps: number
+  thin: boolean
+}
+
+export interface Curve {
+  symbol: string
+  trade_date: string
+  slope_bps_per_day: number
+  annualised_carry_pct: number
+  points: CurvePoint[]
+}
+
+export interface MoveSplit {
+  contract_id: string
+  symbol: string
+  from_date: string
+  to_date: string
+  total_bps: number
+  gold_move_bps: number
+  roll_down_bps: number
+  curve_change_bps: number
+  residual_bps: number
+}
+
+export interface TermStructureResponse {
+  kind: 'empty' | 'user_uploaded' | 'synthetic'
+  synthetic: boolean
+  method: string[]
+  curves: Curve[]
+  splits: MoveSplit[]
 }
