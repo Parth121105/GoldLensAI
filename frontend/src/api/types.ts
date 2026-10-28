@@ -456,6 +456,7 @@ export interface Curve {
   trade_date: string
   slope_bps_per_day: number
   annualised_carry_pct: number
+  raw_check_annualised_pct: number | null
   points: CurvePoint[]
 }
 
@@ -477,4 +478,49 @@ export interface TermStructureResponse {
   method: string[]
   curves: Curve[]
   splits: MoveSplit[]
+}
+
+// --- Lifecycle (GET /api/lifecycle) ---------------------------------------------------------------
+
+export interface CalendarEntry {
+  symbol: string
+  contract_id: string | null
+  expiry_month: string
+  launch_month: string
+  listing_date: string
+  tender_start: string
+  expiry: string
+  expiry_source: string
+  tender_trading_days: number
+  making_charge: string | null
+  spec_version_id: string
+}
+
+export interface ContractStatus {
+  contract_id: string
+  trade_date: string
+  days_to_expiry: number
+  trading_days_to_expiry: number
+  phase: 'trading' | 'near_expiry' | 'tender_period'
+}
+
+export interface YearlyRow {
+  year: number
+  symbol: string
+  lots_traded: number
+  total_value_crore: number
+  trading_days: number | null
+  partial_year: boolean
+}
+
+export interface LifecycleResponse {
+  kind: 'empty' | 'user_uploaded' | 'synthetic'
+  trade_dates: string[]
+  notes: string[]
+  expiry_buffer_days: number
+  calendar: CalendarEntry[]
+  status: ContractStatus[]
+  yearly_source: string | null
+  yearly_problem: string | null
+  yearly: YearlyRow[]
 }

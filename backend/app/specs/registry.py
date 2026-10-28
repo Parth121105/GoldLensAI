@@ -106,6 +106,7 @@ class ContractSpec:
     sources: tuple[SourceCitation, ...]
     notes: tuple[str, ...]
     contract_start_text: str = ""
+    contract_start_day: int | None = None  # day of the launch month; holidays move it to the next working day
     tender_period: TenderPeriod | None = None
     delivery_settlement: str = ""
     making_charge: MakingCharge | None = None
@@ -255,6 +256,7 @@ def _parse_spec(s: dict, sources: dict[str, Source]) -> ContractSpec:
         sources=tuple(citations),
         notes=tuple(s.get("notes", [])),
         contract_start_text=s.get("contract_start_text", ""),
+        contract_start_day=(s.get("contract_start_rule") or {}).get("day"),
         tender_period=_tender(s.get("tender_period")),
         delivery_settlement=s.get("delivery_settlement", ""),
         making_charge=_making(s.get("making_charge")),

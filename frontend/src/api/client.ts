@@ -2,6 +2,7 @@ import type {
   DatasetStatus,
   InstrumentsResponse,
   ObservationsResponse,
+  LifecycleResponse,
   RelativeValueResponse,
   TermStructureResponse,
   Readiness,
@@ -78,6 +79,7 @@ export const api = {
   readiness: () => request<Readiness>('/api/readiness'),
   relativeValue: () => request<RelativeValueResponse>('/api/relative-value'),
   termStructure: () => request<TermStructureResponse>('/api/term-structure'),
+  lifecycle: () => request<LifecycleResponse>('/api/lifecycle'),
   runResearch: (body: ResearchRequest) =>
     request<ResearchResponse>('/api/research', {
       method: 'POST',

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
-import type { RelativeValueResponse, TermStructureResponse } from '../../api/types'
+import type { LifecycleResponse, RelativeValueResponse, TermStructureResponse } from '../../api/types'
 import { useSession } from '../../state/context'
 
 /** Fetches an analysis endpoint again whenever the imported data changes. */
@@ -26,3 +26,4 @@ function useAnalysis<T>(fetcher: () => Promise<T>) {
 
 export const useRelativeValue = () => useAnalysis<RelativeValueResponse>(api.relativeValue)
 export const useTermStructure = () => useAnalysis<TermStructureResponse>(api.termStructure)
+export const useLifecycle = () => useAnalysis<LifecycleResponse>(api.lifecycle)

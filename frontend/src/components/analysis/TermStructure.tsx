@@ -72,12 +72,34 @@ function TermStructure({ ts, error }: { ts: TermStructureResponse | null; error:
       detailsSummary="How the curve and the split are calculated"
     >
       {ts.synthetic && <Notice>Synthetic data. These curves are invented.</Notice>}
+      <CarryLine date={current} curves={curves} />
       <div className="mt-3 grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <CurveChart curves={curves} />
         <SlopeTable curves={curves} />
       </div>
       <MoveSplitTable splits={splits} firstDate={dates[0] === current} />
     </DiagramCard>
+  )
+}
+
+function CarryLine({ date, curves }: { date: string; curves: Curve[] }) {
+  const fitted = curves.map((c) => c.annualised_carry_pct)
+  const raw = curves.map((c) => c.raw_check_annualised_pct).filter((v): v is number => v != null)
+  const mean = fitted.reduce((a, b) => a + b, 0) / fitted.length
+  const range = (v: number[]) =>
+    Math.min(...v) === Math.max(...v) ? `${v[0].toFixed(1)}%` : `${Math.min(...v).toFixed(1)}–${Math.max(...v).toFixed(1)}%`
+  return (
+    <p className="mt-3 text-[15px] leading-relaxed text-ink">
+      On {day(date)}, later-expiring gold futures cost about {mean.toFixed(0)}% a year more than nearer ones ({range(fitted)} across the{' '}
+      {curves.length} contracts).
+      {raw.length > 0 && (
+        <span className="text-ink-2">
+          {' '}
+          Cross-checked against the raw MCX closing prices of each contract's nearest and farthest expiry, before any conversion or fitting:{' '}
+          {range(raw)}.
+        </span>
+      )}
+    </p>
   )
 }
 

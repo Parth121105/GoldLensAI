@@ -1,3 +1,4 @@
+import { LifecycleSections } from '../components/analysis/Lifecycle'
 import { CalendarX2, Hammer, Hourglass, MapPin, ShieldAlert } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -69,6 +70,8 @@ export function Contracts() {
         </DiagramCard>
 
         <NotAdjusted instruments={list ?? null} error={instruments.error} />
+
+        <LifecycleSections />
 
         {!datasets.data && datasets.error ? null : contracts.length > 0 ? (
           <Comparison contracts={contracts} instruments={list ?? []} />

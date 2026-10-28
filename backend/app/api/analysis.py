@@ -194,6 +194,9 @@ class CurveOut(BaseModel):
     trade_date: date
     slope_bps_per_day: float
     annualised_carry_pct: float
+    raw_check_annualised_pct: float | None = Field(
+        description="Carry from the nearest and farthest raw closing prices as quoted, no normalization or fit"
+    )
     points: list[CurvePointOut]
 
 
@@ -229,6 +232,18 @@ TERM_METHOD = [
 ]
 
 
+def _raw_carry(merged: list[Observation], symbol: str, trade_date: date) -> float | None:
+    """Annualised carry from the nearest and farthest expiries' closing prices exactly as MCX quotes them."""
+    import math
+
+    rows = sorted((o for o in merged if o.symbol == symbol and o.trade_date == trade_date), key=lambda o: o.expiry)
+    if len(rows) < 2 or rows[0].expiry == rows[-1].expiry:
+        return None
+    near, far = rows[0], rows[-1]
+    per_day = math.log(float(far.close) / float(near.close)) / (far.expiry - near.expiry).days
+    return round((math.exp(per_day * 365) - 1) * 100, 3)
+
+
 @router.get("/term-structure", response_model=TermStructureResponse)
 def term_structure_view(store: SessionStore = Depends(get_store)) -> TermStructureResponse:
     merged, _ = merge_observations(store.snapshot())
@@ -241,6 +256,7 @@ def term_structure_view(store: SessionStore = Depends(get_store)) -> TermStructu
             CurveOut(
                 symbol=c.symbol, trade_date=c.trade_date, slope_bps_per_day=round(c.slope_bps_per_day, 4),
                 annualised_carry_pct=round(c.annualised_carry_pct, 3),
+                raw_check_annualised_pct=_raw_carry(merged, c.symbol, c.trade_date),
                 points=[
                     CurvePointOut(
                         contract_id=p.contract_id, expiry=p.expiry, days_to_expiry=p.days_to_expiry,
@@ -260,5 +276,94 @@ def term_structure_view(store: SessionStore = Depends(get_store)) -> TermStructu
                 residual_bps=round(s.residual_bps, 2),
             )
             for s in ts.splits
+        ],
+    )
+
+
+# --- Lifecycle --------------------------------------------------------------------------------
+
+
+class CalendarEntryOut(BaseModel):
+    symbol: str
+    contract_id: str | None
+    expiry_month: str
+    launch_month: str
+    listing_date: date
+    tender_start: date
+    expiry: date
+    expiry_source: str
+    tender_trading_days: int
+    making_charge: str | None
+    spec_version_id: str
+
+
+class ContractStatusOut(BaseModel):
+    contract_id: str
+    trade_date: date
+    days_to_expiry: int
+    trading_days_to_expiry: int
+    phase: str
+
+
+class YearlyRowOut(BaseModel):
+    year: int
+    symbol: str
+    lots_traded: int
+    total_value_crore: float
+    trading_days: int | None
+    partial_year: bool
+
+
+class LifecycleResponse(BaseModel):
+    kind: str
+    trade_dates: list[date]
+    notes: list[str]
+    expiry_buffer_days: int
+    calendar: list[CalendarEntryOut]
+    status: list[ContractStatusOut]
+    yearly_source: str | None
+    yearly_problem: str | None
+    yearly: list[YearlyRowOut]
+
+
+LIFECYCLE_NOTES = [
+    "Listing, tender-period and expiry dates come from the verified MCX specifications. MCX holidays are "
+    "not applied, so dates not in the imported data are nominal (weekends skipped only).",
+    "Tender period: the last 3 or 5 trading days including expiry day, by specification version. Positions "
+    "open at expiry go to compulsory delivery, with making charges for GOLDTEN, GOLDGUINEA and GOLDPETAL.",
+    "Yearly volume is from the MCX gold data package table A2. The latest year runs only to the package date.",
+]
+
+
+@router.get("/lifecycle", response_model=LifecycleResponse)
+def lifecycle_view(store: SessionStore = Depends(get_store)) -> LifecycleResponse:
+    from app.analysis.lifecycle import contract_calendar, contract_status, yearly_volume
+
+    merged, _ = merge_observations(store.snapshot())
+    assumptions = default_assumptions()
+    yearly = yearly_volume()
+    last_year = max((r.year for r in yearly.rows), default=None)
+    return LifecycleResponse(
+        kind=store.kind.value,
+        trade_dates=sorted({o.trade_date for o in merged}),
+        notes=LIFECYCLE_NOTES,
+        expiry_buffer_days=assumptions.expiry_buffer_days,
+        calendar=[CalendarEntryOut(
+            symbol=e.symbol, contract_id=e.contract_id, expiry_month=e.expiry_month, launch_month=e.launch_month,
+            listing_date=e.listing_date, tender_start=e.tender_start, expiry=e.expiry, expiry_source=e.expiry_source,
+            tender_trading_days=e.tender_trading_days, making_charge=e.making_charge, spec_version_id=e.spec_version_id,
+        ) for e in contract_calendar(merged)],
+        status=[
+            ContractStatusOut(contract_id=s.contract_id, trade_date=s.trade_date, days_to_expiry=s.days_to_expiry,
+                              trading_days_to_expiry=s.trading_days_to_expiry, phase=s.phase)
+            for s in contract_status(merged, assumptions.expiry_buffer_days)
+        ],
+        yearly_source=yearly.source_file,
+        yearly_problem=yearly.problem,
+        yearly=[
+            YearlyRowOut(year=r.year, symbol=r.symbol, lots_traded=r.lots_traded,
+                         total_value_crore=round(float(r.total_value_lakh) / 100, 2), trading_days=r.trading_days,
+                         partial_year=r.year == last_year)
+            for r in yearly.rows
         ],
     )
