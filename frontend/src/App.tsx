@@ -4,6 +4,7 @@ import { Shell } from './components/Shell'
 import { useRoute } from './lib/router'
 import type { RoutePath } from './lib/router'
 import { SessionProvider } from './state/session'
+import { Alerts } from './views/Alerts'
 import { Contracts } from './views/Contracts'
 import { DataImport } from './views/DataImport'
 import { Methodology } from './views/Methodology'
@@ -15,6 +16,7 @@ const VIEWS: Record<RoutePath, () => JSX.Element> = {
   '/contracts': Contracts,
   '/data': DataImport,
   '/research': Research,
+  '/alerts': Alerts,
   '/methodology': Methodology,
 }
 

@@ -67,5 +67,22 @@
       "unit": "INR per 1 g coin, paid by the buyer only on delivery",
       "why": "From the GOLDPETAL specification PDFs. Zero unless a position reaches delivery."
     }
+  },
+  "alerts": {
+    "z_threshold": {
+      "value": 2.5,
+      "unit": "standard deviations from the pair's own normal gap",
+      "why": "An alert needs the gap to move this far from its trailing average. A gap that is always there (such as the Mumbai-Ahmedabad basis) is not a signal."
+    },
+    "baseline_dates": {
+      "value": 20,
+      "unit": "earlier trade dates of the same contract pair",
+      "why": "The pair's normal gap and its usual variation are measured over this many earlier dates. With fewer, no alert is possible."
+    },
+    "extra_margin_bps": {
+      "value": 0,
+      "unit": "bps on top of the round-trip cost",
+      "why": "The move away from normal must exceed the round-trip cost of trading both legs plus this margin."
+    }
   }
 }

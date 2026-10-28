@@ -421,3 +421,75 @@ def verdict_view(store: SessionStore = Depends(get_store)) -> VerdictResponse:
         kind=store.kind.value, trade_dates=len({o.trade_date for o in merged}), needed_per_pair=needed,
         pairs=pairs, statement=statement,
     )
+
+
+# --- Alerts -----------------------------------------------------------------------------------
+
+
+class AlertOut(BaseModel):
+    trade_date: date
+    contract_a: str
+    contract_b: str
+    gap_bps: float
+    normal_gap_bps: float
+    move_bps: float
+    z: float
+    cost_bps: float
+
+
+class AlertsResponse(BaseModel):
+    kind: str
+    trade_date: date | None
+    quiet: bool
+    headline: str
+    reason: str
+    z_threshold: float
+    baseline_dates: int
+    round_trip_cost_bps: float
+    extra_margin_bps: float
+    pairs_checked: int
+    pairs_tradeable: int
+    pairs_with_baseline: int
+    alerts: list[AlertOut]
+
+
+@router.get("/alerts", response_model=AlertsResponse)
+def alerts_view(store: SessionStore = Depends(get_store)) -> AlertsResponse:
+    from app.analysis.alerts import alerts
+
+    merged, _ = merge_observations(store.snapshot())
+    r = alerts(relative_value(merged))
+    if r.alerts:
+        headline, reason = f"{len(r.alerts)} pair(s) moved unusually far from their normal gap", (
+            "Each passed the liquidity, expiry, history, z-score and cost tests below. An alert is a prompt to look, "
+            "not a trade recommendation; closing prices are not fill prices."
+        )
+    else:
+        headline = "No meaningful signal"
+        if r.trade_date is None:
+            reason = "No data is imported."
+        elif r.pairs_with_baseline == 0:
+            reason = (
+                f"No pair has the {r.baseline_dates} earlier dates needed to know its normal gap "
+                f"(the most any pair has is {r.most_history}). Gaps that are always present, such as the "
+                "Mumbai-Ahmedabad basis, are not signals, so nothing can alert yet."
+            )
+        else:
+            reason = (
+                f"None of the {r.pairs_with_baseline} liquid pairs with enough history moved {r.z_threshold} standard "
+                f"deviations and more than the {r.round_trip_cost_bps:.1f} bps round-trip cost from its normal gap."
+            )
+    return AlertsResponse(
+        kind=store.kind.value, trade_date=r.trade_date, quiet=not r.alerts, headline=headline, reason=reason,
+        z_threshold=r.z_threshold, baseline_dates=r.baseline_dates, round_trip_cost_bps=r.round_trip_cost_bps,
+        extra_margin_bps=r.extra_margin_bps, pairs_checked=r.pairs_checked, pairs_tradeable=r.pairs_tradeable,
+        pairs_with_baseline=r.pairs_with_baseline,
+        alerts=[
+            AlertOut(
+                trade_date=a.trade_date, contract_a=a.contract_a, contract_b=a.contract_b,
+                gap_bps=round(a.gap_bps, 2), normal_gap_bps=round(a.normal_gap_bps, 2),
+                move_bps=round(a.move_bps, 2), z=round(a.z, 2), cost_bps=round(a.cost_bps, 2),
+            )
+            for a in r.alerts
+        ],
+    )

@@ -1,4 +1,5 @@
 import type {
+  AlertsResponse,
   DatasetStatus,
   InstrumentsResponse,
   ObservationsResponse,
@@ -82,6 +83,7 @@ export const api = {
   relativeValue: () => request<RelativeValueResponse>('/api/relative-value'),
   termStructure: () => request<TermStructureResponse>('/api/term-structure'),
   lifecycle: () => request<LifecycleResponse>('/api/lifecycle'),
+  alerts: () => request<AlertsResponse>('/api/alerts'),
   verdict: () => request<VerdictResponse>('/api/verdict'),
   syntheticValidation: () => request<SyntheticValidationResponse>('/api/validation/synthetic'),
   runResearch: (body: ResearchRequest) =>

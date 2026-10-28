@@ -576,3 +576,31 @@ export interface VerdictResponse {
   pairs: { symbol_pair: string; eligible_dates: number; needed: number; verdict: string }[]
   statement: string
 }
+
+
+// --- Alerts (GET /api/alerts) ---------------------------------------------------------------------------
+
+export interface AlertsResponse {
+  kind: 'empty' | 'user_uploaded' | 'synthetic'
+  trade_date: string | null
+  quiet: boolean
+  headline: string
+  reason: string
+  z_threshold: number
+  baseline_dates: number
+  round_trip_cost_bps: number
+  extra_margin_bps: number
+  pairs_checked: number
+  pairs_tradeable: number
+  pairs_with_baseline: number
+  alerts: {
+    trade_date: string
+    contract_a: string
+    contract_b: string
+    gap_bps: number
+    normal_gap_bps: number
+    move_bps: number
+    z: number
+    cost_bps: number
+  }[]
+}
