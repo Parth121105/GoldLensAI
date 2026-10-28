@@ -43,7 +43,10 @@ def create_app(
     # Imported gold rows are saved under settings.store_dir and reloaded here (see app/store.py).
     app.state.settings = settings or Settings.from_env()
     store_dir = app.state.settings.store_dir
-    app.state.store = SessionStore.open(ImportArchive(store_dir) if store_dir else None)
+    archive = ImportArchive(store_dir) if store_dir else None
+    if archive and app.state.settings.seed_dir:
+        archive.seed_if_empty(app.state.settings.seed_dir)
+    app.state.store = SessionStore.open(archive)
 
     # Every route lives under /api so the Vite dev proxy can forward it unchanged.
     for module in (health, instruments, datasets, observations, research, package, analysis, validation):

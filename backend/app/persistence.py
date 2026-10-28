@@ -69,6 +69,17 @@ class ImportArchive:
         results.sort(key=lambda r: (r.report.imported_at, r.report.source_sha256))
         return results
 
+    def seed_if_empty(self, seed_dir: Path) -> int:
+        """Copy saved imports from ``seed_dir`` when this archive holds none. Returns files copied."""
+        if not seed_dir.is_dir() or (self.directory.is_dir() and any(self.directory.glob("*.json"))):
+            return 0
+        self.directory.mkdir(parents=True, exist_ok=True)
+        copied = 0
+        for path in sorted(seed_dir.glob("*.json")):
+            (self.directory / path.name).write_bytes(path.read_bytes())
+            copied += 1
+        return copied
+
     def clear(self) -> None:
         if not self.directory.is_dir():
             return

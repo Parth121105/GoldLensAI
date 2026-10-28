@@ -23,6 +23,8 @@ from app.research.pairs import SYMBOL_ORDER
 from app.specs import ContractSpec, SpecRegistry, SpecStatus, default_registry
 
 YEARLY_DIR = Path(__file__).resolve().parents[2] / "data" / "raw" / "yearly"
+# Committed copy of the A2 year-wise table, used when raw/yearly/ is empty (fresh clone, deploy).
+SEED_YEARLY_DIR = Path(__file__).resolve().parents[2] / "data" / "seed" / "yearly"
 
 
 def _weekday_on_or_after(d: date) -> date:
@@ -168,8 +170,13 @@ class YearlyVolume:
     problem: str | None
 
 
-def yearly_volume(directory: Path = YEARLY_DIR) -> YearlyVolume:
-    """Year-wise volume per contract from the A2 package table in ``directory``, validated on load."""
+def yearly_volume(directory: Path | None = None) -> YearlyVolume:
+    """Year-wise volume per contract from the A2 package table, validated on load.
+
+    Reads ``directory`` if given; otherwise raw/yearly/, falling back to the committed seed copy.
+    """
+    if directory is None:
+        directory = YEARLY_DIR if any(YEARLY_DIR.glob("A2_*.csv")) else SEED_YEARLY_DIR
     files = sorted(directory.glob("A2_*.csv")) if directory.is_dir() else []
     if not files:
         return YearlyVolume(None, [], f"No A2 year-wise file in {directory.name}/. Add A2_yearwise_all_gold_contracts.csv.")

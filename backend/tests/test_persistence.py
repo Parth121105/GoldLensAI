@@ -203,3 +203,27 @@ def test_real_data_on_disk_blocks_the_demo_until_cleared(tmp_path):
     r = app_over(tmp_path).post("/api/datasets/demo")
 
     assert r.status_code == 409 and "cannot be combined" in r.json()["detail"]
+
+
+# --- Committed real-data seed ------------------------------------------------------------------
+
+
+def test_empty_store_is_seeded_once_and_not_overwritten(tmp_path):
+    from app.settings import DEFAULT_SEED_DIR
+
+    store = tmp_path / "store"
+    app = TestClient(create_app(frontend_dist=None, settings=Settings(store_dir=store, seed_dir=DEFAULT_SEED_DIR)))
+    status = app.get("/api/datasets").json()
+    assert status["kind"] == "user_uploaded" and status["observations"] == 48
+    assert len(list(store.glob("*.json"))) == len(list(DEFAULT_SEED_DIR.glob("*.json"))) == 2
+
+    app.delete("/api/datasets")
+    (store / "keep.txt").write_text("x", encoding="utf-8")
+    assert ImportArchive(store).seed_if_empty(tmp_path / "nothing") == 0
+
+
+def test_seed_holds_only_real_rows():
+    from app.settings import DEFAULT_SEED_DIR
+
+    loaded = ImportArchive(DEFAULT_SEED_DIR).load_all()
+    assert len(loaded) == 2 and not any(r.report.synthetic for r in loaded)

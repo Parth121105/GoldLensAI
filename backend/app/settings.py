@@ -26,6 +26,9 @@ DEFAULT_MAX_TOTAL_BYTES = 40_000_000_000
 # Parsed gold rows are saved here (git-ignored) so imports survive a restart.
 DEFAULT_STORE_DIR = Path(__file__).resolve().parents[1] / "data" / "store"
 _STORE_OFF = {"off", "none", "memory"}
+# Committed processed gold rows from the real MCX Bhavcopies (about 18 KB per day). Copied
+# into an empty store at startup so a fresh deploy shows the real data.
+DEFAULT_SEED_DIR = Path(__file__).resolve().parents[1] / "data" / "seed" / "store"
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,6 +38,8 @@ class Settings:
     max_total_bytes: int = DEFAULT_MAX_TOTAL_BYTES
     # None keeps imports in memory only (the default when Settings is built directly, as in tests).
     store_dir: Path | None = None
+    # None never seeds (the default when Settings is built directly, as in tests).
+    seed_dir: Path | None = None
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -43,7 +48,18 @@ class Settings:
             max_files=_int_env("GOLDLENS_MAX_FILES", DEFAULT_MAX_FILES),
             max_total_bytes=_int_env("GOLDLENS_MAX_TOTAL_BYTES", DEFAULT_MAX_TOTAL_BYTES),
             store_dir=_store_dir_env(),
+            seed_dir=_seed_dir_env(),
         )
+
+
+def _seed_dir_env() -> Path | None:
+    """GOLDLENS_SEED_DIR: saved imports to copy into an empty store at startup, or off to skip."""
+    raw = (os.environ.get("GOLDLENS_SEED_DIR") or "").strip()
+    if not raw:
+        return DEFAULT_SEED_DIR
+    if raw.lower() in _STORE_OFF:
+        return None
+    return Path(raw).expanduser()
 
 
 def _store_dir_env() -> Path | None:
