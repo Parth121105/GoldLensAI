@@ -50,7 +50,8 @@ class SessionStore:
 
     @property
     def persistent(self) -> bool:
-        return self.archive is not None
+        """True when this session's rows are saved to disk. Synthetic sessions never are."""
+        return self.archive is not None and True not in self._synthetic_flags()
 
     @property
     def kind(self) -> DataKind:
@@ -90,7 +91,9 @@ class SessionStore:
                     f"{report.source_file} has already been imported: all {len(result.observations)} of its gold "
                     "rows are already held with identical values."
                 )
-            if self.archive is not None:
+            # Only real market data goes to disk. Synthetic files live in memory for this
+            # session only, so they can never be reloaded alongside real rows.
+            if self.archive is not None and not report.synthetic:
                 try:
                     self.archive.save(result)
                 except OSError as exc:
@@ -150,7 +153,8 @@ class SessionStore:
 
     def clear(self) -> None:
         with self._lock:
-            if self.archive is not None:
+            # A synthetic session was never saved, so clearing it leaves the disk alone.
+            if self.archive is not None and True not in self._synthetic_flags():
                 self.archive.clear()
             self.imports.clear()
             self.package.clear()

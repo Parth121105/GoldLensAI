@@ -41,6 +41,8 @@ class ImportArchive:
 
     def save(self, result: ImportResult) -> None:
         """Write one import atomically. Raises OSError if the disk write fails."""
+        if result.report.synthetic:
+            raise ValueError("Synthetic data is never saved to the real-data store.")
         self.directory.mkdir(parents=True, exist_ok=True)
         target = self._path(result.report.source_sha256)
         tmp = target.with_suffix(".json.tmp")
@@ -58,7 +60,10 @@ class ImportArchive:
                 payload = json.loads(path.read_text(encoding="utf-8"))
                 if payload.get("format_version") != FORMAT_VERSION:
                     raise ValueError(f"unsupported format_version {payload.get('format_version')!r}")
-                results.append(_result_from_dict(payload))
+                result = _result_from_dict(payload)
+                if result.report.synthetic:
+                    raise ValueError("synthetic data is never reloaded from disk")
+                results.append(result)
             except (OSError, ValueError, KeyError, TypeError) as exc:
                 logger.warning("Skipping saved import %s: %s", path.name, exc)
         results.sort(key=lambda r: (r.report.imported_at, r.report.source_sha256))
