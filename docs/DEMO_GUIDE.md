@@ -21,8 +21,8 @@ track, rubric or deadline. Adapt the opening line to the event.
 If the fog does not appear (reduced motion, a narrow window or no WebGL), the header stays
 flat. That is deliberate; nothing else changes.
 
-Data is held in memory, so restarting the server empties the session. Run the demo on a
-server that will not restart during the presentation.
+Imported gold rows are saved to `backend/data/store/`, so a local restart keeps the data;
+research must be re-run after a restart. On Render's free tier a redeploy still empties the session.
 
 ## Three-minute script
 
@@ -88,8 +88,8 @@ Point out the header: **"No market data loaded."** No numbers are invented when 
 | Verdict gates | ≥ 20 holdout signals, t ≥ 2, above controls, majority of qualifying folds positive, net of fully known costs |
 | Costs | Four components in bps per leg-side; any unknown component blocks validation |
 | Provenance | File name, SHA-256 and line number for every observation and flag |
-| Storage | In memory only; lost on restart (documented) |
-| Tests | 293 backend tests, including leakage, purging, holdout-independence, package-import, readiness and regression tests |
+| Storage | Parsed gold rows saved to disk and reloaded on restart; research re-run on demand |
+| Tests | 304 backend tests, including leakage, purging, holdout-independence, package-import, readiness and regression tests |
 
 ### Corrections made before submission
 

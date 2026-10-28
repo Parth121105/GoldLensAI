@@ -458,5 +458,7 @@ def _filename_date_warnings(name: str, trade_dates: list[date]) -> list[str]:
         return []
     return [
         f"Filename suggests {candidates[0]} but the file contains trade dates "
-        f"{trade_dates[0]} to {trade_dates[-1]}. File contents are used."
+        f"{trade_dates[0]} to {trade_dates[-1]}. MCX returns the latest trading day when the requested "
+        "date is a holiday or invalid, so no data exists for the requested date. The rows are kept "
+        "under the date the file itself states."
     ]

@@ -2,7 +2,8 @@
 
 Uploads are sent as the raw request body (Content-Type text/csv) with the
 original file name in the ``filename`` query parameter. Files are parsed in
-memory by the existing importer and never written to disk.
+memory by the existing importer; the uploaded bytes are never written to disk.
+Only the parsed gold rows are saved (app/persistence.py), when the store has an archive.
 """
 
 from __future__ import annotations
@@ -38,13 +39,18 @@ from app.ingestion.package import (
 from app.research.engine import merge_observations
 from app.settings import Settings
 from app.specs import default_registry
-from app.store import SessionStore, StoreError
+from app.store import AlreadyHeldError, SessionStore, StoreError
 
 router = APIRouter(tags=["datasets"])
 
 STORAGE_NOTE = (
     "In server memory only. Lost when the server restarts, redeploys or (on Render's free "
     "tier) spins down after inactivity. Nothing is written to disk."
+)
+STORAGE_NOTE_SAVED = (
+    "Parsed gold rows are saved on the server's disk and reloaded after a restart; uploaded files "
+    "themselves are not kept. Package tables and research results stay in memory. On a host "
+    "without a persistent disk (Render's free tier) a redeploy still empties the session."
 )
 MAX_REJECTED_SHOWN = 200
 MAX_FILENAME = 200
@@ -109,7 +115,7 @@ def build_status(store: SessionStore, settings: Settings) -> DatasetStatus:
     dates = sorted({o.trade_date for o in observations})
     return DatasetStatus(
         kind=store.kind.value,
-        storage=STORAGE_NOTE,
+        storage=STORAGE_NOTE_SAVED if store.persistent else STORAGE_NOTE,
         files=[report_out(r, _provenance(r)) for r in imports],
         observations=len(observations),
         trade_date_from=dates[0] if dates else None,
@@ -178,6 +184,8 @@ def _store_package(data: bytes, name: str, store: SessionStore, settings: Settin
         if research_rows and table.accepted:
             try:
                 store.add(result, max_files=settings.max_files, max_total_bytes=settings.max_total_bytes)
+            except AlreadyHeldError:
+                research_rows = 0  # its futures rows are already held; the package table is still kept
             except StoreError as exc:
                 raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 

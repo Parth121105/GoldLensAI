@@ -36,8 +36,12 @@ described below.
 - **Filename.** It is used only as a display name, never as a path.
 - **Synthetic labelling.** A name starting with `SYNTHETIC_` marks the file as
   synthetic.
-- **Storage.** Accepted observations are kept in the server's memory for the
-  session (never on disk), so they are lost on restart or redeploy.
+- **Storage.** The uploaded file is never written to disk. The accepted gold
+  rows and the import report are saved as one JSON file per import in
+  `backend/data/store/` (git-ignored; `GOLDLENS_STORE_DIR` overrides it, `off`
+  disables it) and reloaded at startup. Re-importing an identical file, or a file
+  whose gold rows are all already held with identical values, returns 409 and
+  stores nothing. **Clear session** deletes the saved files.
 
 ## Supported layouts
 
@@ -147,3 +151,19 @@ expiries.
 Files whose names start with `SYNTHETIC_` are reported as `synthetic: true`.
 The fixtures in `backend/tests/fixtures/synthetic/` are hand-written for tests
 and are not market data.
+
+## Importing a folder of Bhavcopy files
+
+Put MCX "BhavCopyDateWise" downloads (HTML tables saved as `.xls`) or CSVs in
+`backend/data/raw/bhavcopy/`, then from `backend/`:
+
+```
+python -m app.cli import-dir data/raw/bhavcopy
+```
+
+Each file's gold futures rows are saved to the store and listed per day and
+contract. A file whose rows are already held (a re-download of the same day)
+is skipped. If a file's name asks for one date but it contains another, MCX
+served the latest trading day because the requested date was a holiday or
+invalid; the rows keep the date the file states, and a warning says so.
+Restart the server afterwards so it loads the new rows.

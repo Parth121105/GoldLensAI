@@ -2,6 +2,7 @@
 
     python -m app.cli specs
     python -m app.cli import <file.csv> [--date-order DMY|MDY] [--json]
+    python -m app.cli import-dir <folder> [--store-dir DIR]
     python -m app.cli research <file.csv> [<file.csv> ...] [--costs costs.json] [--horizon N]
     python -m app.cli package-extract <package.pdf> <output-dir>
     python -m app.cli package-audit <table.csv> [<table.csv> ...] [--out audit.json]
@@ -38,6 +39,12 @@ def main(argv: list[str] | None = None) -> int:
     p_import.add_argument("--date-order", choices=[o.value for o in DateOrder])
     p_import.add_argument("--json", action="store_true", help="Print the full report as JSON")
 
+    p_dir = sub.add_parser(
+        "import-dir", help="Import every Bhavcopy file in a folder and save the gold rows to the store"
+    )
+    p_dir.add_argument("folder", type=Path)
+    p_dir.add_argument("--store-dir", type=Path, help="Defaults to GOLDLENS_STORE_DIR or backend/data/store")
+
     p_research = sub.add_parser("research", help="Run spread research and walk-forward validation")
     p_research.add_argument("files", type=Path, nargs="+")
     p_research.add_argument("--date-order", choices=[o.value for o in DateOrder])
@@ -64,6 +71,8 @@ def main(argv: list[str] | None = None) -> int:
         return _package_audit(args.files, args.out)
     if args.command == "readiness":
         return _readiness(args.files)
+    if args.command == "import-dir":
+        return _import_dir(args.folder, args.store_dir)
     if args.command == "research":
         return _research(args.files, args.date_order and DateOrder(args.date_order), args.costs,
                          args.horizon)
@@ -89,6 +98,48 @@ def _print_specs() -> int:
     for symbol, gap in sorted(registry.uncovered.items()):
         print(f"No specification PDF covers {symbol} expiries {gap}.")
     return 0
+
+
+def _import_dir(folder: Path, store_dir: Path | None) -> int:
+    """Import each file in date order of name, saving accepted gold rows; already-held days are skipped."""
+    from collections import Counter
+
+    from app.persistence import ImportArchive
+    from app.settings import Settings
+    from app.store import AlreadyHeldError, SessionStore, StoreError
+
+    settings = Settings.from_env()
+    target = store_dir or settings.store_dir
+    if target is None:
+        print("error: GOLDLENS_STORE_DIR is off; pass --store-dir", file=sys.stderr)
+        return 1
+    store = SessionStore.open(ImportArchive(target))
+    files = sorted(p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in {".csv", ".xls", ".htm", ".html", ".txt"})
+    if not files:
+        print(f"No Bhavcopy files in {folder}", file=sys.stderr)
+        return 1
+    failed = 0
+    for path in files:
+        try:
+            result = import_bhavcopy(path)
+            store.add(result, max_files=settings.max_files, max_total_bytes=settings.max_total_bytes)
+        except AlreadyHeldError:
+            print(f"{path.name}: skipped, every gold row is already held")
+            continue
+        except (ImportFailedError, StoreError, OSError) as exc:
+            print(f"{path.name}: not imported: {exc}", file=sys.stderr)
+            failed += 1
+            continue
+        report = result.report
+        for w in report.warnings:
+            print(f"{path.name}: warning: {w}")
+        per_day = Counter((o.trade_date, o.symbol) for o in result.observations)
+        for (day, symbol), n in sorted(per_day.items()):
+            expiries = sorted({o.expiry for o in result.observations if o.trade_date == day and o.symbol == symbol})
+            print(f"{path.name}: {day} {symbol:<10} {n} contracts ({', '.join(f'{e:%d%b%Y}'.upper() for e in expiries)})")
+    print(f"Store {target}: {len(store.imports)} files, "
+          f"{sum(len(r.observations) for r in store.imports)} gold rows. Restart the server to load them.")
+    return 1 if failed else 0
 
 
 def _import(path: Path, order: DateOrder | None, as_json: bool) -> int:

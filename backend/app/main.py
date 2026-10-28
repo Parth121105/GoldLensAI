@@ -17,6 +17,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from app import __version__
 from app.api import datasets, health, instruments, observations, package, research
 from app.frontend import mount_frontend
+from app.persistence import ImportArchive
 from app.settings import Settings
 from app.store import SessionStore
 
@@ -39,9 +40,10 @@ def create_app(
     # Research responses are large JSON documents; compress them over the wire.
     app.add_middleware(GZipMiddleware, minimum_size=1024)
 
-    # Imported data lives in this process's memory only (see app/store.py).
-    app.state.store = SessionStore()
+    # Imported gold rows are saved under settings.store_dir and reloaded here (see app/store.py).
     app.state.settings = settings or Settings.from_env()
+    store_dir = app.state.settings.store_dir
+    app.state.store = SessionStore.open(ImportArchive(store_dir) if store_dir else None)
 
     # Every route lives under /api so the Vite dev proxy can forward it unchanged.
     for module in (health, instruments, datasets, observations, research, package):

@@ -33,7 +33,7 @@ labelled with how it is known:
 |---|---|
 | Import of a **genuine** MCX Bhavcopy | **Unverified.** No genuine file exists in the repository, and none has been tested. |
 | Normalization or research on contracts expiring **after Jun/Jul 2026** | **Blocked by design.** Their specifications are unverified (section 7.4). |
-| Data that survives a restart | Not implemented. Storage is memory only. |
+| Data that survives a restart | Implemented for imported gold rows (`backend/data/store/`). Package tables and research results are memory only. |
 | Separate sessions per user | Not implemented. One shared session. |
 | Frontend unit tests | None. No test framework is installed. The frontend is covered by browser checks run from outside the repo. |
 
@@ -464,8 +464,9 @@ curl.exe -X POST "http://localhost:8000/api/research" -H "Content-Type: applicat
 
 ## 7. Known limitations and risks
 
-1. **Memory-only storage.** Uploads and research results are lost on restart, redeploy or
-   Render free-tier spin-down. *(Verified: `store.py`; nothing is written to disk.)*
+1. **Storage.** Parsed gold rows are saved to `backend/data/store/` and survive a local
+   restart; package tables and research results do not. On Render's free tier the disk is
+   not persistent, so a redeploy or spin-down still empties the session. *(`persistence.py`.)*
 2. **One shared session.** There are no accounts, and every visitor shares one dataset. Run
    a single server process, since each process has its own memory.
 3. **Render free tier.** The service sleeps when idle; the first request can take about a

@@ -1,7 +1,9 @@
-"""In-memory session store for imported files and the latest research run.
+"""Session store for imported files and the latest research run.
 
-Nothing is written to disk. Everything held here is lost when the process
-stops: a local restart, a Render redeploy, or a free-tier spin-down.
+With an ``ImportArchive`` (the default app setup), the parsed gold rows of every
+imported file are also saved to disk and reloaded at startup, so imports survive a
+restart (see app/persistence.py). Without one, everything lives in memory and is
+lost when the process stops. Package tables and research results are memory only.
 """
 
 from __future__ import annotations
@@ -10,8 +12,9 @@ import threading
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from app.ingestion.models import ImportResult, RejectedRow
+from app.ingestion.models import ImportResult, Observation, RejectedRow
 from app.ingestion.package import PackageImport
+from app.persistence import ImportArchive
 
 
 class DataKind(StrEnum):
@@ -25,6 +28,10 @@ class StoreError(ValueError):
     """Upload refused; the message is safe to show to the user."""
 
 
+class AlreadyHeldError(StoreError):
+    """Every row of the file is already held with identical values (for example a re-downloaded day)."""
+
+
 @dataclass(slots=True)
 class SessionStore:
     imports: list[ImportResult] = field(default_factory=list)
@@ -32,7 +39,18 @@ class SessionStore:
     # observations: annual aggregates and option premiums never enter a price series.
     package: list[PackageImport] = field(default_factory=list)
     research: dict | None = None
+    # Saves each accepted import to disk; None keeps the session in memory only.
+    archive: ImportArchive | None = None
     _lock: threading.Lock = field(default_factory=threading.Lock)
+
+    @classmethod
+    def open(cls, archive: ImportArchive | None) -> "SessionStore":
+        """A store holding every import saved in ``archive``, oldest first."""
+        return cls(imports=archive.load_all() if archive else [], archive=archive)
+
+    @property
+    def persistent(self) -> bool:
+        return self.archive is not None
 
     @property
     def kind(self) -> DataKind:
@@ -67,8 +85,22 @@ class SessionStore:
                 raise StoreError(f"Session already holds the maximum of {max_files} files.")
             if self.total_bytes + report.size_bytes > max_total_bytes:
                 raise StoreError(f"Session size limit of {max_total_bytes} bytes would be exceeded.")
+            if result.observations and self._all_held(result.observations):
+                raise AlreadyHeldError(
+                    f"{report.source_file} has already been imported: all {len(result.observations)} of its gold "
+                    "rows are already held with identical values."
+                )
+            if self.archive is not None:
+                try:
+                    self.archive.save(result)
+                except OSError as exc:
+                    raise StoreError(f"{report.source_file} could not be saved to disk: {exc.strerror or exc}.") from exc
             self.imports.append(result)
             self.research = None  # earlier results no longer match the data
+
+    def _all_held(self, observations: list[Observation]) -> bool:
+        held = {(o.trade_date, o.contract_id): _values(o) for r in self.imports for o in r.observations}
+        return all(held.get((o.trade_date, o.contract_id)) == _values(o) for o in observations)
 
     def add_package(self, table: PackageImport, *, max_files: int, max_total_bytes: int, counted: bool = True) -> None:
         """Store one package table.
@@ -118,6 +150,8 @@ class SessionStore:
 
     def clear(self) -> None:
         with self._lock:
+            if self.archive is not None:
+                self.archive.clear()
             self.imports.clear()
             self.package.clear()
             self.research = None
@@ -137,6 +171,10 @@ class SessionStore:
     def snapshot(self) -> list[ImportResult]:
         with self._lock:
             return list(self.imports)
+
+
+def _values(o: Observation) -> tuple:
+    return (o.open, o.high, o.low, o.close, o.previous_close, o.settlement, o.volume, o.value, o.open_interest)
 
 
 def _same(table: PackageImport, a: dict, b: dict) -> bool:

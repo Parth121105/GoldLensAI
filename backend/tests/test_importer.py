@@ -249,3 +249,70 @@ def test_utf16_files_get_an_encoding_message_not_binary(encoding):
 
     with pytest.raises(ImportFailedError, match="UTF-16"):
         import_bhavcopy_bytes(data, source_name="excel_unicode.csv")
+
+
+# --- MCX "BhavCopyDateWise" download: an HTML table saved with an .xls extension -----------
+
+HTML_HEADER = [
+    "Date", "Instrument Name", "Symbol", "Expiry Date", "Option Type", "Strike Price", "Open", "High",
+    "Low", "Close", "Previous Close", "Volume(Lots)", "Volume(In 000's)", "Value(Lacs)", "Open Interest(Lots)",
+]
+
+
+AFTER_27_OCT = date(2026, 10, 28)
+
+
+def mcx_html(rows: list[list[str]]) -> bytes:
+    """The layout of the real download (synthetic values): padded symbols, '27 Oct 2026' dates, '04DEC2026' expiries."""
+    head = "".join(f'<th style="padding: 5px;">{h}</th>' for h in HTML_HEADER)
+    body = "".join("<tr>" + "".join(f'<td style="padding: 5px; text-align: left;">{c}</td>' for c in r) + "</tr>" for r in rows)
+    return f'<table border="1"><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>'.encode()
+
+
+def html_row(day, symbol, expiry, close, option="-", lots="10"):
+    return [day, "FUTCOM", symbol, expiry, option, "0", close, close, close, close, close, lots,
+            "1.000 GRMS  ", "14.00", "5"]
+
+
+def test_mcx_html_download_with_padded_symbols_and_compact_expiries():
+    data = mcx_html([
+        html_row("27 Oct 2026", "GOLDM       ", "05NOV2026", "142509.00"),
+        html_row("27 Oct 2026", "GOLDM       ", "04DEC2026", "144042.00"),
+        html_row("27 Oct 2026", "GOLDTEN     ", "30OCT2026", "142713.00"),
+        html_row("27 Oct 2026", "GOLDM       ", "29OCT2026", "2827.50", option="CE"),
+    ])
+    result = import_bhavcopy_bytes(data, source_name="SYNTHETIC_BhavCopyDateWise_27102026.xls", today=AFTER_27_OCT)
+
+    assert result.report.trade_dates == [date(2026, 10, 27)]
+    assert not any("Filename suggests" in w for w in result.report.warnings)
+    assert result.report.skipped == {"option rows (out of scope)": 1}
+    # Each expiry is its own contract; nothing is stitched into a near-month series.
+    assert sorted(o.contract_id for o in result.observations) == [
+        "GOLDM-2026-11-05", "GOLDM-2026-12-04", "GOLDTEN-2026-10-30"]
+    assert {o.symbol for o in result.observations} == {"GOLDM", "GOLDTEN"}
+
+
+def test_mcx_returns_the_latest_trading_day_for_a_holiday_request():
+    """Asked for Sunday 25 Oct 2026 (DDMMYYYY in the name); MCX served Friday 23 Oct."""
+    data = mcx_html([html_row("23 Oct 2026", "GOLDM", "05NOV2026", "140453.00")])
+    result = import_bhavcopy_bytes(data, source_name="SYNTHETIC_BhavCopyDateWise_25102026.xls", today=AFTER_27_OCT)
+
+    assert result.report.trade_dates == [date(2026, 10, 23)]
+    (warning,) = [w for w in result.report.warnings if "Filename suggests" in w]
+    assert "Filename suggests 2026-10-25" in warning and "latest trading day" in warning
+
+
+def test_response_dates_in_month_day_year_order():
+    """Requests use DD/MM/YYYY; the MCX response uses MM/DD/YYYY. 10/27/2026 can only be MDY."""
+    rows = "10/27/2026,FUTCOM,GOLDTEN,10/30/2026,XX,0,141502,142995,140872,142713,141797,5,1,1\n"
+    result = run_inline(rows, today=AFTER_27_OCT)
+
+    assert result.report.date_order == "MDY"
+    (obs,) = result.observations
+    assert (obs.trade_date, obs.expiry) == (date(2026, 10, 27), date(2026, 10, 30))
+
+
+def test_ambiguous_numeric_dates_are_not_guessed():
+    rows = "03/10/2026,FUTCOM,GOLDTEN,31-Dec-2026,XX,0,1,1,1,1,1,5,1,1\n"
+    assert run_inline(rows, date_order=DateOrder.MDY, today=AFTER_27_OCT).observations[0].trade_date == date(2026, 3, 10)
+    assert run_inline(rows, date_order=DateOrder.DMY, today=AFTER_27_OCT).observations[0].trade_date == date(2026, 10, 3)

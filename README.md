@@ -49,7 +49,7 @@ A three-minute demo script and a judge checklist are in
 | Deployment | One free Render web service (`render.yaml`). See [Deploying to Render](#deploying-to-render). |
 | Contract specifications | Verified from MCX circulars for expiries Aug/Sep 2025 – Jun/Jul 2026. Other periods are unverified. See [docs/methodology/specifications.md](docs/methodology/specifications.md). |
 | Normalization | INR per gram at 999 fineness, with tests. See [docs/methodology/normalization.md](docs/methodology/normalization.md). |
-| Data import | Upload CSVs in the dashboard (or the CLI). Held **in server memory only**. See [docs/data-import.md](docs/data-import.md). |
+| Data import | Upload CSVs in the dashboard (or the CLI). Parsed gold rows are **saved to disk** and survive a restart. See [docs/data-import.md](docs/data-import.md). |
 | Research engine | Spread anomalies, cost model (unknown ≠ zero), lifecycle filters and walk-forward validation, run from the dashboard. See [docs/methodology/research.md](docs/methodology/research.md). One real MCX trading day (23 Oct 2026) has been imported and audited; research needs years of daily history, so nothing has been validated on real data. On the one-year synthetic demo every pair is `insufficient_data`, which is the honest result for that much history. |
 | Historical MCX data | **None in Git.** A user-supplied package (year-wise totals 2005–2026 and one trading day, 23 Oct 2026, of futures and options) and the raw MCX date-wise file for that day were audited locally; see [docs/data-audit-mcx-gold-package.md](docs/data-audit-mcx-gold-package.md). Readiness verdict: `INSUFFICIENT_DATA`. See [docs/data-requirements.md](docs/data-requirements.md) for what to download. |
 
@@ -69,7 +69,7 @@ A three-minute demo script and a judge checklist are in
    research ──► fixed contract pairs → spread = 10,000 × ln(A ÷ B)
                  → trailing-baseline z flags → tick and cost rungs
                  → walk-forward folds + one final holdout → verdict per pair
-   SessionStore (in memory): imported files and the latest research result
+   SessionStore: imported files (gold rows saved to backend/data/store) and the latest research result (memory)
 ```
 
 The frontend does no financial calculation; it formats and displays what the API returns.
@@ -219,12 +219,15 @@ files are refused.
 
 ### Where uploaded data lives
 
-Uploads are parsed in memory and never written to disk. The parsed
-observations and the latest research result live **in the server process's
-memory only**. They are lost when the server restarts, on every Render
-redeploy, and when Render's free tier spins the service down. The latest
-research result is discarded whenever the imported data changes. Run one
-server process (the default), since each process has its own memory.
+Uploads are parsed in memory; the uploaded files are never written to disk.
+The **parsed gold rows** of each accepted file are saved as one small JSON file
+in `backend/data/store/` (git-ignored) and reloaded when the server starts, so
+imports survive a local restart. Re-importing an identical file, or a file whose
+gold rows are all already held (for example a re-downloaded day), is refused.
+**Clear session** deletes the saved files. Package tables (A1, A2, B2) and the
+latest research result stay in memory; research is re-run from the saved rows.
+On Render's free tier the disk is not persistent, so a redeploy or spin-down
+still empties the session. Run one server process (the default).
 
 Limits (environment variables, all optional):
 
@@ -233,9 +236,10 @@ Limits (environment variables, all optional):
 | `GOLDLENS_MAX_UPLOAD_BYTES` | 25,000,000 bytes per file (MCX's full-market daily `.xls` is about 17 MB) |
 | `GOLDLENS_MAX_FILES` | 2,000 files per session (about eight years of daily files) |
 | `GOLDLENS_MAX_TOTAL_BYTES` | 40,000,000,000 bytes uploaded per session |
+| `GOLDLENS_STORE_DIR` | `backend/data/store`; set to `off` to keep imports in memory only |
 
-Only accepted gold rows are kept in memory (about 30 per daily file), never the
-raw upload, so the byte limits bound upload volume rather than memory.
+Only accepted gold rows are kept (about 30 per daily file, roughly 12 KB on disk),
+never the raw upload, so the byte limits bound upload volume rather than memory.
 
 ## API
 
@@ -330,7 +334,7 @@ Results on 25 Oct 2026 (Windows 11, Node 24.22.1, Python 3.15.1):
 
 | Check | Result |
 |---|---|
-| Backend tests | 293 passed (26 Oct 2026) |
+| Backend tests | 304 passed (28 Oct 2026) |
 | Frontend lint (oxlint) and type-check + build (`tsc -b && vite build`) | Pass |
 | Browser walk-through against the production build (empty state, malformed and valid upload, research run, contracts chart and table, deep link, console errors) | 17 of 17 checks passed |
 | Animation runtime checks (fog created and destroyed, reduced motion, phone width, failed requests, console errors) | 10 of 10 passed |
@@ -401,7 +405,7 @@ No environment secrets are needed and none are defined.
   This is deliberately conservative; `min_events` in `backend/app/research/config.py` controls it.
 - **Charts and theme.** The charts are hand-drawn SVG, with keyboard-readable tooltips and table views. The interface
   has one dark theme.
-- **Single session.** There are no user accounts, and data is held in memory only.
+- **Single session.** There are no user accounts; one shared dataset, saved to the server's disk.
 
 ## Dependency notes
 

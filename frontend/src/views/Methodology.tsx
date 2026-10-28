@@ -193,7 +193,7 @@ per g @999 = per gram × 999 ÷ price-basis fineness`}
             <ul className="space-y-2 text-[13px] leading-relaxed text-ink-2">
               {[...sources.values()].map((s) => (
                 <li key={s.id}>
-                  <a href={s.retrieved_from} target="_blank" rel="noreferrer" className="font-medium text-ink underline underline-offset-2">{s.id}</a>{' '}
+                  <span className="font-medium text-ink" title={s.retrieved_from}>{s.id}</span>{' '}
                   ({s.issued_on}) {s.title}. <span className="text-ink-3">{s.retrieval_notes}</span>
                 </li>
               ))}
@@ -204,10 +204,10 @@ per g @999 = per gram × 999 ÷ price-basis fineness`}
         <DiagramCard
           className="lg:col-span-6"
           title="Limits"
-          description="End-of-day data held in memory: what the results cannot tell you."
+          description="End-of-day data from uploaded files: what the results cannot tell you."
           details={
             <ul className="list-disc space-y-1.5 pl-5">
-              <li>Imported data lives in server memory only and is lost on restart, redeploy or free-tier spin-down.</li>
+              <li>Imported gold rows are saved on the server's disk and survive a restart; research results are recomputed. On a host without a persistent disk, a redeploy empties the session.</li>
               <li>Uploaded files are labelled user-uploaded; GoldLensAI does not verify that they came from MCX.</li>
               <li>Bhavcopy close is an end-of-day value, not a synchronized executable quote. Volume is not order-book depth.</li>
               <li>Only one real MCX trading day (23 Oct 2026) has been checked; the UDiFF layout has not been checked against a real file.</li>
@@ -268,7 +268,7 @@ const NOT_IN_BUILD = [
   'Location-basis, making-charge and carry adjustments.',
   'Years of real daily history: one MCX trading day has been imported, far short of what walk-forward testing needs.',
   'A trained machine-learning model: research is rule-based, and the readiness check reports what a model would need.',
-  'Storage that survives a restart, and user accounts.',
+  'User accounts and separate sessions per user.',
   'Trading, alerts or recommendations, which are out of scope by design.',
 ]
 
