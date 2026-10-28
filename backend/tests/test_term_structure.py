@@ -117,3 +117,14 @@ def test_endpoints_expose_curves_and_assumptions():
     rv = client.get("/api/relative-value").json()["liquidity"]
     assert "3 trading days" in rv["official_tender_period"]
     assert {a["key"] for a in rv["assumptions"]} >= {"liquidity.min_traded_value_lakh", "lifecycle.expiry_buffer_days"}
+
+
+def test_verdict_endpoint_claims_nothing_below_the_minimum():
+    client = TestClient(create_app(frontend_dist=None))
+    text = HEADER + "".join(curve_rows(date(2026, 10, 23), 14000.0))
+    client.post("/api/datasets", params={"filename": "v.csv"}, content=text.encode(), headers={"Content-Type": "text/csv"})
+
+    body = client.get("/api/verdict").json()
+    assert body["needed_per_pair"] == 686 and len(body["pairs"]) == 6
+    assert all(p["verdict"] == "insufficient_data" for p in body["pairs"])
+    assert "No edge is claimed" in body["statement"]

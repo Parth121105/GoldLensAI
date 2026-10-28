@@ -566,3 +566,13 @@ export interface SyntheticValidationResponse {
   model: string[]
   runs: SyntheticRun[]
 }
+
+// --- Real-data verdict (GET /api/verdict) ------------------------------------------------------------
+
+export interface VerdictResponse {
+  kind: 'empty' | 'user_uploaded' | 'synthetic'
+  trade_dates: number
+  needed_per_pair: number
+  pairs: { symbol_pair: string; eligible_dates: number; needed: number; verdict: string }[]
+  statement: string
+}

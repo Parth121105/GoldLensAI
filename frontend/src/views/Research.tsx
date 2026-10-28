@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import { COST_COMPONENTS } from '../api/types'
 import type { CostInput, CostName, Finding, OutcomeStats, PairResult, Readiness, ResearchResponse, Series } from '../api/types'
 import { Figure } from '../components/Bento'
+import { RealVerdictSection } from '../components/analysis/RealVerdict'
 import { RelativeValueSection } from '../components/analysis/RelativeValue'
 import { SyntheticValidationSection } from '../components/analysis/SyntheticValidation'
 import { TermStructureSection } from '../components/analysis/TermStructure'
@@ -48,6 +49,7 @@ export function Research() {
       {research.error && <ErrorNote>{research.error}</ErrorNote>}
 
       <InkGrid>
+        {hasData && <RealVerdictSection />}
         {hasData && <ReadinessMeter readiness={readiness.data} error={readiness.error} />}
         {hasData && <RelativeValueSection />}
         {hasData && <TermStructureSection />}

@@ -367,3 +367,57 @@ def lifecycle_view(store: SessionStore = Depends(get_store)) -> LifecycleRespons
             for r in yearly.rows
         ],
     )
+
+
+# --- Real-data verdict ------------------------------------------------------------------------
+
+
+class PairVerdictOut(BaseModel):
+    symbol_pair: str
+    eligible_dates: int
+    needed: int
+    verdict: str
+
+
+class VerdictResponse(BaseModel):
+    kind: str
+    trade_dates: int
+    needed_per_pair: int
+    pairs: list[PairVerdictOut]
+    statement: str
+
+
+@router.get("/verdict", response_model=VerdictResponse)
+def verdict_view(store: SessionStore = Depends(get_store)) -> VerdictResponse:
+    """Eligible dates per symbol pair against the walk-forward minimum. No edge is claimed below it."""
+    from itertools import combinations
+
+    from app.research.config import ResearchConfig
+    from app.research.pairs import SYMBOL_ORDER, build_pair_series
+    from app.research.readiness import Minimums
+
+    merged, _ = merge_observations(store.snapshot())
+    config = ResearchConfig()
+    needed = Minimums.from_config(config).eligible_dates_per_pair
+    dates_by_pair: dict[str, set[date]] = {f"{a}/{b}": set() for a, b in combinations(SYMBOL_ORDER, 2)}
+    for s in build_pair_series(merged, config):
+        dates_by_pair[s.symbol_pair].update(p.trade_date for p in s.eligible_points)
+    pairs = [
+        PairVerdictOut(
+            symbol_pair=k, eligible_dates=len(v), needed=needed,
+            verdict="insufficient_data" if len(v) < needed else "run_walk_forward",
+        )
+        for k, v in dates_by_pair.items()
+    ]
+    if all(p.verdict == "insufficient_data" for p in pairs):
+        statement = (
+            f"No edge is claimed. Every pair has fewer than the {needed} eligible dates the walk-forward test "
+            "needs, so the verdict on real data is Insufficient data. The problem statement accepts this: a "
+            "rigorous demonstration that no persistent edge can yet be shown is a valid outcome."
+        )
+    else:
+        statement = "At least one pair has enough eligible dates; run the walk-forward test for a verdict."
+    return VerdictResponse(
+        kind=store.kind.value, trade_dates=len({o.trade_date for o in merged}), needed_per_pair=needed,
+        pairs=pairs, statement=statement,
+    )
