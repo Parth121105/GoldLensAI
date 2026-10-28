@@ -80,3 +80,31 @@ An alert fires on the latest date only if all of these hold:
 2. The pair has 20 earlier dates.
 3. The carry-adjusted gap is at least 2.5 standard deviations from the pair's own normal gap.
 4. The move exceeds the round-trip cost.
+
+## 8. When research runs, and what shows before a baseline exists
+
+Research runs on real data without being asked: at startup on the bundled files, and after
+every upload, with the default horizon (5) and the costs in the assumptions file. The
+Research page can run it again with other settings. Synthetic data is only researched on
+request.
+
+A pair needs about 20 eligible dates before its normal gap, and a z-score against it, means
+anything (the same 20 the alerts use). Until then the Overview shows, for the selected pair
+on the latest date:
+
+- the carry-adjusted gap of the nearest expiries outside the 7-day buffer;
+- the largest distance of any expiry from its own contract's fitted carry line
+  (the residual of ln P = a + b·T);
+- the same two contracts' gap on each loaded date, and every expiry pairing's gap that day;
+- one line on what more data unlocks.
+
+The z-score gauge, spread-versus-baseline chart, normal band and daily deviation bars
+replace these automatically once the pair has 20 eligible dates and a baseline.
+
+## 9. Data labels
+
+The real MCX Bhavcopy rows committed with the app (`backend/data/seed/store/`, recognised by
+the SHA-256 of the source file) are labelled "Real MCX Bhavcopy data · dates · specs
+verified from MCX PDFs". Files uploaded in the browser are labelled "User-uploaded · origin
+unverified", because the app cannot check where they came from. Synthetic data is labelled
+synthetic on every page and is never mixed with either.

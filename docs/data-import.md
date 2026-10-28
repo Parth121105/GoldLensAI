@@ -146,6 +146,11 @@ time, row counts, the trade dates covered, and coverage per contract. Each
 contract is identified as `SYMBOL-EXPIRY` and is never spliced with other
 expiries.
 
+The two real Bhavcopies bundled with the app are labelled "Real MCX Bhavcopy data"; any
+file uploaded in the browser is labelled "User-uploaded · origin unverified", since the app
+cannot confirm it came from MCX. After an upload of real data, research runs again
+automatically.
+
 ## Synthetic files
 
 Files whose names start with `SYNTHETIC_` are reported as `synthetic: true`.

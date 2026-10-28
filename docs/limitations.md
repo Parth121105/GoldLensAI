@@ -37,3 +37,7 @@
 - On Render's free tier the disk is not persistent. Files uploaded through the app are lost on
   redeploy or spin-down; the bundled real data in `backend/data/seed/` is reloaded at startup.
 - There is one shared session and no user accounts.
+- Research on real data runs at startup and after each upload. With about three years of
+  daily files it would take noticeably longer, and startup would wait for it.
+- The synthetic validation is computed once during the deploy build. Without that file the
+  endpoint computes it on request, which takes minutes on Render's free CPU.
