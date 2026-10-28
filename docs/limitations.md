@@ -4,7 +4,8 @@
 
 - **Two real trading days** (23 and 27 Oct 2026). Each contract pair needs 686 eligible dates
   for a walk-forward verdict, so the real-data verdict is *Insufficient data* and no edge is
-  claimed. About three years of daily Bhavcopies would change that.
+  claimed. About three years of daily Bhavcopies would change that; see
+  [data-requirements.md](data-requirements.md).
 - **Closing prices, not fills.** MCX close is a last-half-hour weighted average. Nobody could
   necessarily have traded at it.
 - **Volume is not depth.** Daily volume and open interest show activity, not how much could be

@@ -1,57 +1,54 @@
-# Data needed from you
+# Data needed for a real-data verdict
 
-mcxindia.com and mcxccl.com return HTTP 403 to automated requests (checked
-2026-10-25 on the Bhavcopy page, the gold product pages, a circular PDF and
-the MCXCCL UDiFF page). These files have to be downloaded in a browser.
+Gold Lens holds two real trading days (23 and 27 Oct 2026). The walk-forward needs **686
+eligible dates per contract pair** before it can return anything other than *Insufficient
+data* (see [methodology.md](methodology.md#5-signal-and-walk-forward)). This page lists what
+would close that gap.
 
-Put CSVs in `backend/data/raw/`. Git ignores that folder. Send PDFs however is
-convenient; they will be cited in `backend/app/specs/mcx_gold_specs.json`.
+mcxindia.com and mcxccl.com refuse automated requests, and Gold Lens does not scrape them.
+Every file below has to be downloaded by a person in a browser.
 
-## 1. Daily Bhavcopy files (required for any real analysis)
+## 1. Daily Bhavcopy files
 
-**Where:** https://www.mcxindia.com/market-data/bhavcopy
+**Where:** https://www.mcxindia.com/market-data/bhavcopy (date-wise download, commodity
+futures). How to import them: [data-import.md](data-import.md), or the "Adding new Bhavcopy
+files" section of the [README](../README.md).
 
-**What:** one end-of-day file per trading day, in CSV format, for the
-commodity futures segment.
+**How many:** about 250 trading days a year, so 686 eligible dates is close to three years
+of daily files. Dates where a contract is inside its 7-day pre-expiry buffer or has no volume
+do not count, so in practice slightly more is needed.
 
-**Which dates:**
+**Which years:** the verified specifications only reach back to expiries in early 2025
+(GOLDGUINEA Jan 2025, GOLDTEN and GOLDPETAL Apr 2025, GOLDM Sep 2025). Daily files from early
+2025 to today give fewer than 500 trading days, which is not enough on its own. Two ways forward:
 
-| Priority | Range | Why |
+- add older specification PDFs (section 2) and import older Bhavcopies, or
+- keep importing new days as they come. Pairs involving GOLDTEN cannot reach 686 dates
+  before about 2028, because GOLDTEN was only listed in April 2025.
+
+## 2. Older contract specification PDFs
+
+Needed only to normalize contracts expiring before the dates above. Put each PDF in
+`backend/data/raw/specs/` (git-ignored) and transcribe its values into
+[`backend/app/specs/mcx_gold_specs.json`](../backend/app/specs/mcx_gold_specs.json).
+Coverage today: [methodology/specifications.md](methodology/specifications.md).
+
+| Contract | Earliest verified expiry | Needed for older history |
 |---|---|---|
-| First | Any 2–3 recent trading days | Confirms the actual column layout before bulk download |
-| Main | 1 Jul 2025 – 30 Jun 2026 | Matches the verified specification window (expiries Aug/Sep 2025 – Jun/Jul 2026) |
-| Later | After 30 Jun 2026 | Usable only once a newer specification circular is supplied (see 2b) |
+| GOLDM | Sep 2025 | "contract onwards" PDFs before November 2025 |
+| GOLDGUINEA | Jan 2025 | PDFs before January 2025 |
+| GOLDPETAL | Apr 2025 | PDFs before April 2025 |
+| GOLDTEN | Apr 2025 | none; this is its first listing |
 
-**Why so many days:** walk-forward validation needs at least about 20
-non-overlapping signal events in the holdout alone, for each contract pair.
-With roughly 250 trading days, three folds and a 30% holdout, that's
-achievable only if the data spans many months. A few days of data will
-correctly return `insufficient_data`.
+## 3. Better cost figures (optional)
 
-**Expected format:** either layout described in
-[data-import.md](data-import.md). The importer reports which layout it
-detected and whether that layout has been confirmed against a real file. It
-hasn't been confirmed yet; your first files will do that.
+Costs are already set as stated assumptions in
+[`backend/config/assumptions.json`](../backend/config/assumptions.json) (9.6 bps round trip).
+Replacing them with sourced figures would make a verdict more credible:
 
-## 2. Circulars and specification PDFs
-
-| # | Document | Why it's needed | Status |
-|---|---|---|---|
-| a | GOLDM, GOLDTEN, GOLDGUINEA, GOLDPETAL contract specification PDFs from https://www.mcxindia.com/products/bullion/gold | Confirms the copies obtained from a mirror | 403 |
-| b | MCX circular 552/2026 (Sept 2026) and any 2026 circular modifying these contracts | Extends the verified window past Jun/Jul 2026 | 403 |
-| c | MCX/TRD/134/2025 (2025-03-18), GOLDTEN launch | Confirms the GOLDTEN listing date and the specifications of the Apr–Jul 2025 expiries | not read |
-| d | Earlier specification circulars for GOLDM, GOLDGUINEA, GOLDPETAL | Needed only if you want history before Aug 2025 | not read |
-| e | MCX/PMT/375/2026 (Good Delivery, July 2026) | Confirms it doesn't change purity or price basis | secondary reports only |
-| f | MCXCCL UDiFF Bhavcopy format document | Confirms column names and units | 403 |
-
-## 3. Cost sources (needed to move beyond "costs unknown")
-
-| Component | Typical source |
+| Component | Source |
 |---|---|
 | Exchange transaction charges | MCX circular on transaction charges |
-| Statutory taxes and levies | Commodity Transaction Tax, stamp duty, GST on charges, SEBI fees. Official notifications, or your broker's contract note |
-| Brokerage | Your broker's tariff |
-| Slippage | No official source. Must be a stated assumption, or measured from executable quotes |
-
-Until these are provided, the engine reports "costs unknown" and can't
-produce a validated finding.
+| Statutory levies | CTT, stamp duty, GST on charges and SEBI fees, from official notifications or a broker contract note |
+| Brokerage | A broker's tariff |
+| Slippage | No official source. Measure it from executable quotes or keep it as an assumption |
