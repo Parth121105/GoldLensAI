@@ -62,6 +62,10 @@ def main(argv: list[str] | None = None) -> int:
     p_ready = sub.add_parser("readiness", help="Assess whether Bhavcopy files can support research or a model")
     p_ready.add_argument("files", type=Path, nargs="+")
 
+    sub.add_parser(
+        "precompute-synthetic", help="Save the synthetic validation response so the API need not compute it"
+    )
+
     args = parser.parse_args(argv)
     if args.command == "specs":
         return _print_specs()
@@ -71,6 +75,11 @@ def main(argv: list[str] | None = None) -> int:
         return _package_audit(args.files, args.out)
     if args.command == "readiness":
         return _readiness(args.files)
+    if args.command == "precompute-synthetic":
+        from app.api.validation import write_precomputed
+
+        print(f"wrote {write_precomputed()}")
+        return 0
     if args.command == "import-dir":
         return _import_dir(args.folder, args.store_dir)
     if args.command == "research":

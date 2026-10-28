@@ -18,3 +18,6 @@ echo "Using $(python --version 2>&1), Node $node_version, npm $(npm --version)"
 test -f frontend/dist/index.html
 
 pip install -r backend/requirements.txt
+
+# The synthetic validation takes minutes on the free instance's CPU; compute it once here.
+(cd backend && python -m app.cli precompute-synthetic)

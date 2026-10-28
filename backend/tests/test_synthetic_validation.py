@@ -39,3 +39,14 @@ def test_endpoint_is_labelled_synthetic():
     injected, control = body["runs"]
     assert injected["injected"] and not control["injected"]
     assert injected["round_trip_cost_bps"] == 9.6 and len(injected["cost_labels"]) == 4
+
+
+def test_endpoint_serves_the_precomputed_response_unchanged(tmp_path, monkeypatch):
+    from app.api import validation
+
+    path = validation.write_precomputed(tmp_path / "synthetic.json")
+    monkeypatch.setattr(validation, "PRECOMPUTED", path)
+    with TestClient(create_app()) as client:
+        served = client.get("/api/validation/synthetic").json()
+    assert served == validation.build_response().model_dump(mode="json")
+    assert served["synthetic"] is True

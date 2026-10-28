@@ -3,11 +3,16 @@
 SYNTHETIC. Built in memory on request, never stored, never mixed with imported data.
 Two runs on the same synthetic market: one with known mispricings injected, and a
 control with none, to show the engine finds an edge only where one exists.
+
+The runs are deterministic but slow on a small server (minutes on Render's free CPU), so the
+deploy build writes the response to PRECOMPUTED (``python -m app.cli precompute-synthetic``)
+and the endpoint serves that file when it exists. Without it the runs are computed on request.
 """
 
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
 from fastapi import APIRouter
 from fastapi.concurrency import run_in_threadpool
@@ -25,6 +30,9 @@ from app.research.synthetic_validation import (
 )
 
 router = APIRouter(tags=["validation"])
+
+# Build output, git-ignored. Regenerated on every deploy, so it always matches the deployed code.
+PRECOMPUTED = Path(__file__).resolve().parents[2] / "data" / "cache" / "synthetic_validation.json"
 
 
 class PairResultOut(BaseModel):
@@ -132,8 +140,21 @@ def _run_out(r: SyntheticValidation, label: str, injected: bool) -> RunOut:
 
 @router.get("/validation/synthetic", response_model=SyntheticValidationResponse)
 async def synthetic_validation() -> SyntheticValidationResponse:
-    injected = await run_in_threadpool(cached_run, True)
-    control = await run_in_threadpool(cached_run, False)
+    if PRECOMPUTED.is_file():
+        return SyntheticValidationResponse.model_validate_json(PRECOMPUTED.read_bytes())
+    return await run_in_threadpool(build_response)
+
+
+def write_precomputed(path: Path = PRECOMPUTED) -> Path:
+    """Compute both runs and save the response for the endpoint to serve."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(build_response().model_dump_json(), encoding="utf-8")
+    return path
+
+
+def build_response() -> SyntheticValidationResponse:
+    injected = cached_run(True)
+    control = cached_run(False)
     return SyntheticValidationResponse(
         notice=NOTICE,
         model=[
